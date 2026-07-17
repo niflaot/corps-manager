@@ -38,9 +38,17 @@ func New(ctx context.Context, version string) (*Application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load app config: %w", err)
 	}
+	discordConfig, err := discord.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load discord config: %w", err)
+	}
 	log, err := logger.New(config.Environment.IsDevelopment())
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %w", err)
+	}
+	discordClient, err := discord.New(discordConfig, log)
+	if err != nil {
+		return nil, err
 	}
 	redisConfig, err := redisplatform.LoadConfig()
 	if err != nil {
@@ -54,18 +62,6 @@ func New(ctx context.Context, version string) (*Application, error) {
 	}
 	postgresPool, err := postgres.New(ctx, postgresConfig)
 	if err != nil {
-		_ = redisClient.Close()
-		return nil, err
-	}
-	discordConfig, err := discord.LoadConfig()
-	if err != nil {
-		postgresPool.Close()
-		_ = redisClient.Close()
-		return nil, fmt.Errorf("load discord config: %w", err)
-	}
-	discordClient, err := discord.New(discordConfig, log)
-	if err != nil {
-		postgresPool.Close()
 		_ = redisClient.Close()
 		return nil, err
 	}
@@ -112,9 +108,6 @@ func newHealthService(redisClient *redisplatform.Client, postgresPool *postgres.
 		"redis":    redisClient.Ping,
 		"postgres": postgresPool.Ping,
 		"discord": func(context.Context) error {
-			if !discordClient.Enabled() {
-				return health.ErrDisabled
-			}
 			if !discordClient.Connected() {
 				return errors.New("discord gateway is disconnected")
 			}

@@ -3,12 +3,8 @@ package health
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
-
-// ErrDisabled marks an intentionally disabled dependency.
-var ErrDisabled = errors.New("dependency is disabled")
 
 // Status is the result of a dependency health check.
 type Status string
@@ -18,8 +14,6 @@ const (
 	StatusAvailable Status = "available"
 	// StatusUnavailable means the dependency check failed.
 	StatusUnavailable Status = "unavailable"
-	// StatusDisabled means the dependency is intentionally disabled.
-	StatusDisabled Status = "disabled"
 )
 
 // Check verifies one dependency.
@@ -49,9 +43,7 @@ func (service *Service) Snapshot(ctx context.Context) map[string]Status {
 		go func() {
 			defer workers.Done()
 			status := StatusAvailable
-			if err := check(ctx); errors.Is(err, ErrDisabled) {
-				status = StatusDisabled
-			} else if err != nil {
+			if err := check(ctx); err != nil {
 				status = StatusUnavailable
 			}
 			lock.Lock()

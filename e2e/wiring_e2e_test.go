@@ -1,29 +1,26 @@
 package e2e
 
 import (
-	"encoding/json"
-	"net/http"
+	"strings"
 	"testing"
-
-	"github.com/pixelados-net/discord-bot/platform/health"
-	"github.com/pixelados-net/discord-bot/platform/httpapi"
 )
 
-func TestBaseWiringE2E(t *testing.T) {
-	runtime := startHarness(t)
-	response, err := runtime.client.Get(runtime.baseURL + "/status")
-	if err != nil {
-		t.Fatalf("GET /status: %v", err)
+func TestBaseWiringRequiresDiscordTokenE2E(t *testing.T) {
+	result := runHarness(t, []string{"serve"}, "DISCORD_BOT_TOKEN=")
+	if result.err == nil {
+		t.Fatal("serve succeeded without DISCORD_BOT_TOKEN")
 	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("status code = %d", response.StatusCode)
+	if !strings.Contains(result.output, "DISCORD_BOT_TOKEN is required") {
+		t.Fatalf("output = %q", result.output)
 	}
-	var status httpapi.StatusResponse
-	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {
-		t.Fatalf("decode status: %v", err)
+}
+
+func TestVersionE2E(t *testing.T) {
+	result := runHarness(t, []string{"--version"})
+	if result.err != nil {
+		t.Fatalf("version error = %v, output = %q", result.err, result.output)
 	}
-	if status.Version != "1.0.0" || status.Dependencies["discord"] != health.StatusDisabled {
-		t.Fatalf("status = %#v", status)
+	if result.output != "discord-bot v1.0.0\n" {
+		t.Fatalf("output = %q", result.output)
 	}
 }

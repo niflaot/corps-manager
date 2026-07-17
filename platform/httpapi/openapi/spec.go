@@ -39,7 +39,7 @@ const Spec = `{
           "version": {"type": "string", "example": "1.0.0"},
           "dependencies": {
             "type": "object",
-            "additionalProperties": {"type": "string", "enum": ["available", "unavailable", "disabled"]}
+            "additionalProperties": {"type": "string", "enum": ["available", "unavailable"]}
           }
         }
       }

@@ -3,7 +3,6 @@ package discord
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync/atomic"
 
 	"github.com/bwmarrin/discordgo"
@@ -17,11 +16,8 @@ type Client struct {
 	connected atomic.Bool
 }
 
-// New creates a Discord client. An empty token creates a disabled client.
+// New creates the configured Discord bot client without opening its gateway.
 func New(config Config, log *zap.Logger) (*Client, error) {
-	if strings.TrimSpace(config.Token) == "" {
-		return &Client{log: log}, nil
-	}
 	session, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		return nil, fmt.Errorf("create discord session: %w", err)
@@ -36,20 +32,12 @@ func New(config Config, log *zap.Logger) (*Client, error) {
 
 // AddHandler registers a DiscordGo event handler and returns its remover.
 func (client *Client) AddHandler(handler any) func() {
-	if client.session == nil {
-		return func() {}
-	}
 	return client.session.AddHandler(handler)
 }
 
-// SDK returns the underlying DiscordGo session, or nil when disabled.
+// SDK returns the underlying DiscordGo session.
 func (client *Client) SDK() *discordgo.Session {
 	return client.session
-}
-
-// Enabled reports whether a Discord token configured the gateway.
-func (client *Client) Enabled() bool {
-	return client.session != nil
 }
 
 // Connected reports whether the gateway session is open.
@@ -59,11 +47,6 @@ func (client *Client) Connected() bool {
 
 // Run opens the Discord gateway and blocks until cancellation.
 func (client *Client) Run(ctx context.Context) error {
-	if client.session == nil {
-		client.log.Warn("discord gateway disabled because no token is configured")
-		<-ctx.Done()
-		return nil
-	}
 	if err := client.session.Open(); err != nil {
 		return fmt.Errorf("open discord gateway: %w", err)
 	}

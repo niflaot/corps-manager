@@ -5,7 +5,7 @@
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
 
-`discord-bot` is a production-oriented Go boilerplate for Discord bots. It includes a DiscordGo gateway client, a Fiber operational API with Scalar documentation, Redis and PostgreSQL adapters, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
+`discord-bot` is a production-oriented Go boilerplate for a Discord bot. It includes a DiscordGo gateway client, a Fiber operational API with Scalar documentation, Redis and PostgreSQL adapters, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
 
 ## Run
 
@@ -14,7 +14,7 @@ cp .env.example .env
 go run ./cmd serve
 ```
 
-Set `DISCORD_BOT_TOKEN` to connect the gateway. When it is empty, the gateway is intentionally disabled while Fiber, Redis, PostgreSQL, health checks, and cron wiring remain available for local development.
+`DISCORD_BOT_TOKEN` is mandatory. The process rejects startup before opening the HTTP server or Discord gateway when the variable is missing or empty.
 
 The public endpoints are:
 
@@ -32,7 +32,7 @@ go run ./cmd --version
 
 - `cmd/` contains the process entrypoint.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
-- `platform/discord/` wraps DiscordGo and exposes its session for bot handlers.
+- `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.
 - `platform/httpapi/` contains Fiber, Scalar, OpenAPI, and graceful HTTP shutdown.
 - `platform/redis/` and `platform/postgres/` contain reusable infrastructure clients.
 - `platform/clock/` provides real and deterministic clocks.
