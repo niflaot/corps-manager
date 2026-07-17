@@ -1,0 +1,12 @@
+.git/
+.idea/
+.vscode/
+.codex/
+.claude/
+plan/
+plans/
+bin/
+dist/
+build/
+*.test
+coverage.out

@@ -1,0 +1,30 @@
+# Agent workspaces and planning
+.codex/
+.claude/
+.cursor/
+.windsurf/
+plan/
+plans/
+
+# Go build output
+bin/
+dist/
+build/
+coverage.out
+*.test
+
+# Local runtime configuration
+.env
+.env.*
+!.env.example
+
+# IDE and editor state
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
