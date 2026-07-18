@@ -5,7 +5,9 @@
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
 
-`discord-bot` is a production-oriented Go boilerplate for a Discord bot. It includes a DiscordGo gateway client, a Fiber operational API with Scalar documentation, Redis and PostgreSQL adapters, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
+`discord-bot` is a production-oriented Go boilerplate for one Discord bot. It includes DiscordGo, a Fiber API with Scalar documentation, Redis and PostgreSQL adapters, Liquibase migrations, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
+
+Its first domain item is `messages`: PostgreSQL-backed static text/embed definitions assigned to Discord channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support.
 
 ## Run
 
@@ -14,13 +16,39 @@ cp .env.example .env
 go run ./cmd serve
 ```
 
-`DISCORD_BOT_TOKEN` is mandatory. The process rejects startup before opening the HTTP server or Discord gateway when the variable is missing or empty.
+`DISCORD_BOT_TOKEN` and `DISCORD_BOT_API_KEY` are mandatory. The process rejects startup before opening the HTTP server or Discord gateway when either is invalid.
 
 The public endpoints are:
 
 - `GET /status` for application and dependency status.
 - `GET /docs` for the Scalar API reference.
 - `GET /openapi.json` for the OpenAPI document.
+
+Every `/api/messages` route requires `Authorization: Bearer <DISCORD_BOT_API_KEY>`. Mutations also use `Idempotency-Key`; replacements and archival require the current numeric revision in `If-Match`. The full CRUD, assignment, reconciliation, schemas, and response contract is available at `/docs`.
+
+## Database
+
+PostgreSQL migrations use the same composed Liquibase layout as `pixels`. The root changelog is `database/changelog.xml`, while `messages` owns its changelog and versioned SQL under `internal/messages/postgres/`.
+
+```sh
+cp database/liquibase.example.properties database/liquibase.properties
+liquibase --defaults-file=database/liquibase.properties validate
+liquibase --defaults-file=database/liquibase.properties update
+```
+
+Liquibase must run before the bot starts. The application never mutates schema at runtime.
+
+Create a managed message with:
+
+```sh
+curl -X POST http://127.0.0.1:3100/api/messages \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H "Idempotency-Key: rules-v1" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"rules","guildId":"123456789012345678","channelId":"234567890123456789","payload":{"content":"Server rules","embeds":[],"allowedMentions":{"parse":[]}}}'
+```
+
+API writes are asynchronous with respect to Discord. Inspect `state`, `desiredHash`, `observedHash`, and `lastError`, or call `POST /api/messages/{key}/reconcile` to schedule an immediate check. Channel reassignments and archival deliberately leave the previous remote message untouched in v1.
 
 Print the application version with:
 
@@ -31,6 +59,7 @@ go run ./cmd --version
 ## Structure
 
 - `cmd/` contains the process entrypoint.
+- `internal/messages/` contains static-message domain logic and its PostgreSQL adapter.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
 - `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.
 - `platform/httpapi/` contains Fiber, Scalar, OpenAPI, and graceful HTTP shutdown.
@@ -38,6 +67,7 @@ go run ./cmd --version
 - `platform/clock/` provides real and deterministic clocks.
 - `platform/bootstrap/` owns dependency wiring and lifecycle.
 - `e2e/` builds the real binary and validates the base wiring through HTTP.
+- `database/` contains the root Liquibase changelog and configuration templates.
 
 ## Validate
 

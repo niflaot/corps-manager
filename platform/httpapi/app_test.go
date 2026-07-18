@@ -17,7 +17,7 @@ func TestStatusAndDocumentation(t *testing.T) {
 		"postgres": func(context.Context) error { return nil },
 		"redis":    func(context.Context) error { return errors.New("offline") },
 	})
-	application := New(zap.NewNop(), appconfig.Config{Environment: appconfig.EnvironmentTest}, healthService, "1.0.0")
+	application := New(zap.NewNop(), appconfig.Config{Environment: appconfig.EnvironmentTest}, Config{APIKey: "test-api-key-long", BodyLimit: 1 << 20}, healthService, Dependencies{}, "1.0.0")
 	response, err := application.Test(httptest.NewRequest("GET", "/status", nil))
 	if err != nil {
 		t.Fatalf("status request: %v", err)

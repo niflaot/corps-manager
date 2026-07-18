@@ -5,10 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/pixelados-net/discord-bot/internal/cronjob"
+	"github.com/pixelados-net/discord-bot/internal/messages"
+	messagespostgres "github.com/pixelados-net/discord-bot/internal/messages/postgres"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/clock"
 	"github.com/pixelados-net/discord-bot/platform/discord"
@@ -23,13 +26,14 @@ import (
 
 // Application owns the fully wired process and its infrastructure.
 type Application struct {
-	discord   *discord.Client
-	postgres  *postgres.Pool
-	redis     *redisplatform.Client
-	scheduler *cronjob.Scheduler
-	server    *httpapi.Server
-	log       *zap.Logger
-	closeOnce sync.Once
+	discord    *discord.Client
+	postgres   *postgres.Pool
+	redis      *redisplatform.Client
+	scheduler  *cronjob.Scheduler
+	reconciler *messages.Reconciler
+	server     *httpapi.Server
+	log        *zap.Logger
+	closeOnce  sync.Once
 }
 
 // New loads configuration and wires every runtime dependency.
@@ -41,6 +45,10 @@ func New(ctx context.Context, version string) (*Application, error) {
 	discordConfig, err := discord.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load discord config: %w", err)
+	}
+	apiConfig, err := httpapi.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load http config: %w", err)
 	}
 	log, err := logger.New(config.Environment.IsDevelopment())
 	if err != nil {
@@ -65,6 +73,13 @@ func New(ctx context.Context, version string) (*Application, error) {
 		_ = redisClient.Close()
 		return nil, err
 	}
+	messageStore := messagespostgres.NewStore(postgresPool.DB())
+	messageGateway := discord.NewMessageGateway(discordClient)
+	messageSignal := messages.NewSignal()
+	messageService := messages.NewService(messageStore, messageSignal)
+	hostname, _ := os.Hostname()
+	messageReconciler := messages.NewReconciler(messageStore, messageGateway, clock.Real{}, messageSignal,
+		fmt.Sprintf("%s:%d", hostname, os.Getpid()), 25, 4)
 	healthService := newHealthService(redisClient, postgresPool, discordClient)
 	scheduler := cronjob.New(clock.Real{}, log)
 	if err := scheduler.Register(healthJob(healthService, log)); err != nil {
@@ -72,14 +87,20 @@ func New(ctx context.Context, version string) (*Application, error) {
 		_ = redisClient.Close()
 		return nil, err
 	}
-	application := httpapi.New(log, config, healthService, version)
+	if err := scheduler.Register(cronjob.Job{Name: "messages-reconcile", Interval: time.Minute, Handler: messageReconciler.ReconcileDue}); err != nil {
+		postgresPool.Close()
+		_ = redisClient.Close()
+		return nil, err
+	}
+	application := httpapi.New(log, config, apiConfig, healthService, httpapi.Dependencies{Messages: messageService}, version)
 	return &Application{
-		discord:   discordClient,
-		postgres:  postgresPool,
-		redis:     redisClient,
-		scheduler: scheduler,
-		server:    httpapi.NewServer(application, config, log, version),
-		log:       log,
+		discord:    discordClient,
+		postgres:   postgresPool,
+		redis:      redisClient,
+		scheduler:  scheduler,
+		reconciler: messageReconciler,
+		server:     httpapi.NewServer(application, config, log, version),
+		log:        log,
 	}, nil
 }
 
@@ -89,6 +110,7 @@ func (application *Application) Run(ctx context.Context) error {
 	group.Go(func() error { return application.server.Run(groupContext) })
 	group.Go(func() error { return application.discord.Run(groupContext) })
 	group.Go(func() error { return application.scheduler.Run(groupContext) })
+	group.Go(func() error { return application.reconciler.Run(groupContext) })
 	return group.Wait()
 }
 

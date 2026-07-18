@@ -7,7 +7,7 @@ import (
 	"github.com/pixelados-net/discord-bot/platform/httpapi/openapi"
 )
 
-func registerRoutes(application *fiber.App, config appconfig.Config, healthService *health.Service, version string) {
+func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig Config, healthService *health.Service, dependencies Dependencies, version string) {
 	application.Get("/status", func(ctx *fiber.Ctx) error {
 		return ctx.JSON(StatusResponse{
 			Status:       "ok",
@@ -35,6 +35,9 @@ func registerRoutes(application *fiber.App, config appconfig.Config, healthServi
 </body>
 </html>`)
 	})
+	if dependencies.Messages != nil {
+		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
+	}
 	application.Use(func(*fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "route not found")
 	})

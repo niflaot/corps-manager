@@ -16,6 +16,24 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
 
+    env:
+      DISCORD_BOT_INTEGRATION_POSTGRES_DSN: postgres://discord_bot:discord_bot@127.0.0.1:5432/discord_bot?sslmode=disable
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: discord_bot
+          POSTGRES_USER: discord_bot
+          POSTGRES_PASSWORD: discord_bot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U discord_bot -d discord_bot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +46,12 @@ jobs:
 
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
+
+      - name: Validate database migrations
+        run: docker run --rm --network host -v "$PWD:/workspace" -w /workspace liquibase/liquibase:4.31 --defaults-file=database/liquibase.ci.properties validate
+
+      - name: Apply database migrations
+        run: docker run --rm --network host -v "$PWD:/workspace" -w /workspace liquibase/liquibase:4.31 --defaults-file=database/liquibase.ci.properties update
 
       - name: Test
         run: go test ./... -covermode=atomic -coverprofile=coverage.out

@@ -14,6 +14,7 @@ type Client struct {
 	session   *discordgo.Session
 	log       *zap.Logger
 	connected atomic.Bool
+	userID    atomic.Value
 }
 
 // New creates the configured Discord bot client without opening its gateway.
@@ -25,9 +26,23 @@ func New(config Config, log *zap.Logger) (*Client, error) {
 	session.Identify.Intents = config.Intents
 	client := &Client{session: session, log: log}
 	client.AddHandler(func(_ *discordgo.Session, ready *discordgo.Ready) {
+		client.userID.Store(ready.User.ID)
 		log.Info("discord gateway ready", zap.String("user", ready.User.String()))
 	})
 	return client, nil
+}
+
+// BotUserID returns the authenticated Discord bot user snowflake.
+func (client *Client) BotUserID(ctx context.Context) (string, error) {
+	if stored := client.userID.Load(); stored != nil {
+		return stored.(string), nil
+	}
+	user, err := client.session.User("@me", discordgo.WithContext(ctx))
+	if err != nil {
+		return "", err
+	}
+	client.userID.Store(user.ID)
+	return user.ID, nil
 }
 
 // AddHandler registers a DiscordGo event handler and returns its remover.

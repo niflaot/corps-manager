@@ -17,6 +17,7 @@ coverage.out
 .env
 .env.*
 !.env.example
+database/liquibase.properties
 
 # IDE and editor state
 .idea/
