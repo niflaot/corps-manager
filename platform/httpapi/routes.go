@@ -23,6 +23,9 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 	if config.Environment.IsDevelopment() {
 		registerDocumentationRoutes(application)
 	}
+	if dependencies.Guild != nil {
+		application.Get("/guild/members", getGuildMemberCount(dependencies.Guild))
+	}
 	if dependencies.Messages != nil {
 		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
 	}
@@ -35,6 +38,16 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 	application.Use(func(*fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "route not found")
 	})
+}
+
+func getGuildMemberCount(service GuildService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		memberCount, presenceCount, err := service.MemberCount(ctx.UserContext())
+		if err != nil {
+			return fiber.NewError(fiber.StatusServiceUnavailable, "guild statistics unavailable")
+		}
+		return ctx.JSON(GuildStats{MemberCount: memberCount, PresenceCount: presenceCount})
+	}
 }
 
 func registerDocumentationRoutes(application *fiber.App) {

@@ -21,6 +21,7 @@ var Module = fx.Module("discord", fx.Provide(
 	fx.Annotate(provideMessageGateway, fx.As(new(messages.Gateway))),
 	fx.Annotate(provideVerificationGateway, fx.As(new(verification.Gateway))),
 	fx.Annotate(provideGuardGateway, fx.As(new(verification.GuardGateway)), fx.As(fx.Self())),
+	provideGuildGateway,
 	provideHandlers,
 ))
 
@@ -46,6 +47,8 @@ func provideVerificationGateway(client *Client, catalog *localization.Catalog) *
 }
 
 func provideGuardGateway(client *Client) *GuardGateway { return NewGuardGateway(client) }
+
+func provideGuildGateway(client *Client) *GuildGateway { return NewGuildGateway(client) }
 
 func provideHandlers(lifecycle fx.Lifecycle, client *Client, service *verification.Service,
 	catalog *localization.Catalog, gateway *GuardGateway) Handlers {

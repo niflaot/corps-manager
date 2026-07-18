@@ -10,6 +10,7 @@ import (
 	"github.com/pixelados-net/discord-bot/internal/settings"
 	"github.com/pixelados-net/discord-bot/internal/verification"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
+	"github.com/pixelados-net/discord-bot/platform/discord"
 	"github.com/pixelados-net/discord-bot/platform/health"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -48,9 +49,9 @@ func LoadConfig() (Config, error) {
 }
 
 func provideDependencies(messageService *messages.Service, settingService *settings.Service,
-	verificationService *verification.Service, guard *verification.Guard) Dependencies {
+	verificationService *verification.Service, guard *verification.Guard, guildGateway *discord.GuildGateway) Dependencies {
 	return Dependencies{Messages: messageService, Settings: settingService,
-		Verification: verificationService, VerificationGuard: guard}
+		Verification: verificationService, VerificationGuard: guard, Guild: guildGateway}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

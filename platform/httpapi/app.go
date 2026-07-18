@@ -69,6 +69,12 @@ type VerificationGuard interface {
 	Reconcile(context.Context) error
 }
 
+// GuildService contains HTTP-facing Discord guild statistics use cases.
+type GuildService interface {
+	// MemberCount returns the guild's approximate member and online presence counts.
+	MemberCount(context.Context) (int, int, error)
+}
+
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
 	// Messages manages static Discord message definitions.
@@ -79,6 +85,8 @@ type Dependencies struct {
 	Verification VerificationService
 	// VerificationGuard repairs Discord verification guard state.
 	VerificationGuard VerificationGuard
+	// Guild reports public Discord guild statistics.
+	Guild GuildService
 }
 
 // ErrorResponse is a JSON error response body.
@@ -97,6 +105,14 @@ type StatusResponse struct {
 	Version string `json:"version"`
 	// Dependencies contains current infrastructure availability.
 	Dependencies map[string]health.Status `json:"dependencies"`
+}
+
+// GuildStats is the public guild population response body.
+type GuildStats struct {
+	// MemberCount is the guild's approximate total member count.
+	MemberCount int `json:"memberCount"`
+	// PresenceCount is the guild's approximate online member count.
+	PresenceCount int `json:"presenceCount"`
 }
 
 // New creates the Fiber application.
