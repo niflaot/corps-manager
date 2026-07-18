@@ -15,6 +15,9 @@
 - Manage PostgreSQL schema changes through `database/changelog.xml` and domain-owned Liquibase changelogs; do not add standalone migration SQL.
 - Follow standard Go style and avoid unnecessary abstractions or dependencies.
 - All Go code must pass the complete `staticcheck ./...` suite; in particular, error strings must start lowercase and must not end with punctuation to satisfy ST1005.
+- All runtime adapters and third-party SDKs must write through the injected Zap logger; do not allow dependencies to fall back to standard-library or unstructured logging.
+- Log successful recurring health checks at `debug`; log unavailable dependencies and failed checks at `error`.
+- Publish GHCR images only from semantic version tag workflows matching `v*.*.*`; tagged releases must compile and validate before image publication.
 - Never use magic strings for setting keys, interaction identifiers, event names, or configurable defaults; declare named constants or variables with documented defaults.
 - Do not add Docker Compose files or wiki documentation.
 - Run `gofmt`, `go test ./...`, `go vet ./...`, `staticcheck ./...`, and `go test ./... -race` before handing off changes.

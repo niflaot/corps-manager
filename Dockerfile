@@ -10,7 +10,8 @@ COPY internal ./internal
 COPY locales ./locales
 COPY platform ./platform
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/discord-bot ./cmd
+ARG VERSION=1.0.0
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/discord-bot ./cmd
 
 FROM scratch
 

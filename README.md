@@ -26,12 +26,13 @@ DISCORD_BOT_LOG_FORMAT=console
 ```
 
 `DISCORD_BOT_LOG_LEVEL` accepts Zap levels such as `debug`, `info`, `warn`, and `error`. `DISCORD_BOT_LOG_FORMAT` accepts `console` for local readability or `json` for structured ingestion.
+Fiber requests and DiscordGo internals share this same injected Zap logger. Successful recurring dependency health snapshots are emitted only at `debug`; unavailable dependencies are emitted at `error`.
 
-The public endpoints are:
+The public endpoint is:
 
 - `GET /status` for application and dependency status.
-- `GET /docs` for the Scalar API reference.
-- `GET /openapi.json` for the OpenAPI document.
+
+Only when `DISCORD_BOT_ENVIRONMENT=development`, `GET /docs` exposes the Scalar API reference and `GET /openapi.json` exposes its OpenAPI document. Both routes return `404` in `test` and `production`.
 
 Every `/api` route requires `Authorization: Bearer <DISCORD_BOT_API_KEY>`. Message mutations also use `Idempotency-Key`; replacements and archival require the current numeric revision in `If-Match`. Settings use dotted keys and support `GET`, revision-aware `PUT`, and `DELETE` reset. Verification groups, memberships, and manual reconciliation live under `/api/verification`. The full contract is available at `/docs`.
 
@@ -96,6 +97,17 @@ Print the application version with:
 
 ```sh
 go run ./cmd --version
+```
+
+## Release
+
+GHCR publication runs only for tags matching `v*.*.*`. The release workflow validates tests, Vet, Staticcheck and compilation, builds all supported binary targets, and then publishes the multi-architecture image. A tag such as `v1.2.3` produces `v1.2.3`, `1.2.3`, `1.2`, `1`, and `latest` image tags and embeds `1.2.3` in the binary.
+
+Configure the repository Actions secret `DISCORD_WEBHOOK_URL` to enable the tag notification workflow, then publish a release with:
+
+```sh
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
 ## Structure

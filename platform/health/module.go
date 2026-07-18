@@ -46,8 +46,22 @@ func provideHealthJob(service *Service, log *zap.Logger) cronjob.Job {
 		Name:     dependencyHealthJobName,
 		Interval: dependencyHealthJobInterval,
 		Handler: func(ctx context.Context) error {
-			log.Info("dependency health", zap.Any("dependencies", service.Snapshot(ctx)))
+			statuses := service.Snapshot(ctx)
+			if dependenciesAvailable(statuses) {
+				log.Debug("dependency health", zap.Any("dependencies", statuses))
+			} else {
+				log.Error("dependency health check failed", zap.Any("dependencies", statuses))
+			}
 			return nil
 		},
 	}
+}
+
+func dependenciesAvailable(statuses map[string]Status) bool {
+	for _, status := range statuses {
+		if status != StatusAvailable {
+			return false
+		}
+	}
+	return true
 }

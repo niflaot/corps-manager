@@ -62,6 +62,9 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:

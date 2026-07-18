@@ -20,6 +20,24 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 			Dependencies: healthService.Snapshot(ctx.UserContext()),
 		})
 	})
+	if config.Environment.IsDevelopment() {
+		registerDocumentationRoutes(application)
+	}
+	if dependencies.Messages != nil {
+		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
+	}
+	if dependencies.Settings != nil {
+		registerSettingRoutes(application.Group("/api/settings", authenticate(apiConfig.APIKey)), dependencies.Settings)
+	}
+	if dependencies.Verification != nil {
+		registerVerificationRoutes(application.Group("/api/verification", authenticate(apiConfig.APIKey)), dependencies.Verification, dependencies.VerificationGuard)
+	}
+	application.Use(func(*fiber.Ctx) error {
+		return fiber.NewError(fiber.StatusNotFound, "route not found")
+	})
+}
+
+func registerDocumentationRoutes(application *fiber.App) {
 	application.Get("/openapi.json", func(ctx *fiber.Ctx) error {
 		ctx.Type("json")
 		return ctx.SendString(openapi.Spec)
@@ -38,18 +56,6 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`)
-	})
-	if dependencies.Messages != nil {
-		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
-	}
-	if dependencies.Settings != nil {
-		registerSettingRoutes(application.Group("/api/settings", authenticate(apiConfig.APIKey)), dependencies.Settings)
-	}
-	if dependencies.Verification != nil {
-		registerVerificationRoutes(application.Group("/api/verification", authenticate(apiConfig.APIKey)), dependencies.Verification, dependencies.VerificationGuard)
-	}
-	application.Use(func(*fiber.Ctx) error {
-		return fiber.NewError(fiber.StatusNotFound, "route not found")
 	})
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync/atomic"
 
 	"github.com/bwmarrin/discordgo"
@@ -11,6 +12,8 @@ import (
 )
 
 var snowflakePattern = regexp.MustCompile(`^[0-9]{1,20}$`)
+
+const discordLoggerName = "discordgo"
 
 // Client manages a Discord gateway session.
 type Client struct {
@@ -28,12 +31,41 @@ func New(config Config, log *zap.Logger) (*Client, error) {
 		return nil, fmt.Errorf("create discord session: %w", err)
 	}
 	session.Identify.Intents = config.Intents
+	configureDiscordLogger(session, log)
 	client := &Client{session: session, log: log, guildID: config.GuildID}
 	client.AddHandler(func(_ *discordgo.Session, ready *discordgo.Ready) {
 		client.userID.Store(ready.User.ID)
 		log.Info("discord gateway ready", zap.String("user", ready.User.String()))
 	})
 	return client, nil
+}
+
+func configureDiscordLogger(session *discordgo.Session, log *zap.Logger) {
+	switch {
+	case log.Core().Enabled(zap.DebugLevel):
+		session.LogLevel = discordgo.LogDebug
+	case log.Core().Enabled(zap.InfoLevel):
+		session.LogLevel = discordgo.LogInformational
+	case log.Core().Enabled(zap.WarnLevel):
+		session.LogLevel = discordgo.LogWarning
+	default:
+		session.LogLevel = discordgo.LogError
+	}
+	discordLog := log.Named(discordLoggerName).WithOptions(zap.AddCallerSkip(2))
+	discordgo.Logger = func(level, _ int, format string, arguments ...interface{}) {
+		message := strings.TrimSpace(fmt.Sprintf(format, arguments...))
+		field := zap.Int("discordgo_level", level)
+		switch level {
+		case discordgo.LogError:
+			discordLog.Error(message, field)
+		case discordgo.LogWarning:
+			discordLog.Warn(message, field)
+		case discordgo.LogInformational:
+			discordLog.Info(message, field)
+		default:
+			discordLog.Debug(message, field)
+		}
+	}
 }
 
 // GuildID returns the only configured Discord guild snowflake.
