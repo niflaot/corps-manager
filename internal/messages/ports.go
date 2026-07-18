@@ -115,6 +115,10 @@ type Release struct {
 	State State
 	// Error is a sanitized failure message.
 	Error string
+	// DiscordMessageID preserves a remote message created during the failed attempt.
+	DiscordMessageID string
+	// ObservedHash preserves the remote payload hash from the failed attempt.
+	ObservedHash string
 	// CheckedAt is the failed observation timestamp.
 	CheckedAt time.Time
 	// NextCheckAt schedules retry.

@@ -33,6 +33,29 @@ func TestPayloadHashIgnoresDiscordAssignedComponentIDs(t *testing.T) {
 	}
 }
 
+func TestPayloadHashIgnoresDiscordDefaultFalseFields(t *testing.T) {
+	minimal := Payload{Components: []Component{Component(`{"type":17,"components":[{"type":10,"content":"Welcome"}]}`)}}
+	discordResponse := Payload{Components: []Component{Component(`{"type":17,"id":1,"spoiler":false,"components":[{"type":10,"id":2,"content":"Welcome"},{"type":1,"id":3,"components":[{"type":2,"id":4,"style":3,"label":"Join","custom_id":"join","disabled":false}]}]}`)}}
+	desired := Payload{Components: []Component{Component(`{"type":17,"components":[{"type":10,"content":"Welcome"},{"type":1,"components":[{"type":2,"style":3,"label":"Join","custom_id":"join"}]}]}`)}}
+	minimalHash, minimalError := minimal.Hash()
+	responseHash, responseError := discordResponse.Hash()
+	desiredHash, desiredError := desired.Hash()
+	if minimalError != nil || responseError != nil || desiredError != nil || responseHash != desiredHash || minimalHash == desiredHash {
+		t.Fatalf("hashes = %q %q %q, errors = %v %v %v", minimalHash, responseHash, desiredHash,
+			minimalError, responseError, desiredError)
+	}
+}
+
+func TestPayloadHashIgnoresMediaGalleryDefaultSpoiler(t *testing.T) {
+	minimal := Payload{Components: []Component{Component(`{"type":12,"items":[{"media":{"url":"https://example.com/image.png"}}]}`)}}
+	discordResponse := Payload{Components: []Component{Component(`{"type":12,"id":1,"items":[{"media":{"url":"https://example.com/image.png"},"spoiler":false}]}`)}}
+	minimalHash, minimalError := minimal.Hash()
+	responseHash, responseError := discordResponse.Hash()
+	if minimalError != nil || responseError != nil || minimalHash != responseHash {
+		t.Fatalf("hashes = %q %q, errors = %v %v", minimalHash, responseHash, minimalError, responseError)
+	}
+}
+
 func TestDefinitionValidation(t *testing.T) {
 	tests := []struct {
 		name   string

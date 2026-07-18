@@ -2,6 +2,7 @@ package messages
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -9,9 +10,11 @@ import (
 
 type reconcileRepository struct {
 	Repository
-	record     Record
-	completion Completion
-	release    Release
+	record      Record
+	completion  Completion
+	release     Release
+	completeErr error
+	releaseErr  error
 }
 
 func (repository *reconcileRepository) ClaimDue(context.Context, ClaimRequest) ([]Record, error) {
@@ -20,12 +23,12 @@ func (repository *reconcileRepository) ClaimDue(context.Context, ClaimRequest) (
 
 func (repository *reconcileRepository) Complete(_ context.Context, completion Completion) error {
 	repository.completion = completion
-	return nil
+	return repository.completeErr
 }
 
 func (repository *reconcileRepository) Release(_ context.Context, release Release) error {
 	repository.release = release
-	return nil
+	return repository.releaseErr
 }
 
 type reconcileGateway struct {
@@ -33,8 +36,10 @@ type reconcileGateway struct {
 	observed        ObservedMessage
 	getError        error
 	assignmentError error
+	createObserved  *ObservedMessage
 	createCalls     int
 	replaceCalls    int
+	deleteCalls     int
 	nonce           string
 }
 
@@ -49,12 +54,20 @@ func (gateway *reconcileGateway) Get(context.Context, string, string) (ObservedM
 func (gateway *reconcileGateway) Create(_ context.Context, request CreateRequest) (ObservedMessage, error) {
 	gateway.createCalls++
 	gateway.nonce = request.Nonce
+	if gateway.createObserved != nil {
+		return *gateway.createObserved, nil
+	}
 	return ObservedMessage{ID: "new", ChannelID: request.ChannelID, Payload: request.Payload, Owned: true, ComponentsV2: true}, nil
 }
 
 func (gateway *reconcileGateway) Replace(_ context.Context, request ReplaceRequest) (ObservedMessage, error) {
 	gateway.replaceCalls++
 	return ObservedMessage{ID: request.MessageID, ChannelID: request.ChannelID, Payload: request.Payload, Owned: true, ComponentsV2: true}, nil
+}
+
+func (gateway *reconcileGateway) Delete(context.Context, string, string) error {
+	gateway.deleteCalls++
+	return nil
 }
 
 type fixedClock struct{ now time.Time }
@@ -97,6 +110,37 @@ func TestReconcilerRecreatesMissingMessageWithStableNonce(t *testing.T) {
 	}
 	if gateway.createCalls != 1 || len(gateway.nonce) != 25 || repository.completion.DiscordMessageID != "new" {
 		t.Fatalf("create calls = %d, nonce = %q, completion = %#v", gateway.createCalls, gateway.nonce, repository.completion)
+	}
+}
+
+func TestReconcilerPreservesCreatedMessageIDWhenDiscordResponseDrifts(t *testing.T) {
+	record := reconciliationRecord(t)
+	record.DiscordMessageID = ""
+	gatewayCreatePayload := record.Payload
+	gatewayCreatePayload.Components[0] = Component(`{"type":10,"content":"changed"}`)
+	gateway := &reconcileGateway{createObserved: &ObservedMessage{ID: "new", ChannelID: record.ChannelID,
+		Payload: gatewayCreatePayload, Owned: true, ComponentsV2: true}}
+	repository := &reconcileRepository{record: record}
+	reconciler := NewReconciler(repository, gateway, fixedClock{time.Now()}, NewSignal(), "worker", 1, 1)
+	if err := reconciler.ReconcileDue(context.Background()); err != nil {
+		t.Fatalf("ReconcileDue() error = %v", err)
+	}
+	if repository.release.DiscordMessageID != "new" {
+		t.Fatalf("release = %#v", repository.release)
+	}
+}
+
+func TestReconcilerDeletesCreatedOrphanAfterRevisionConflict(t *testing.T) {
+	record := reconciliationRecord(t)
+	record.DiscordMessageID = ""
+	repository := &reconcileRepository{record: record, completeErr: ErrConflict}
+	gateway := &reconcileGateway{}
+	reconciler := NewReconciler(repository, gateway, fixedClock{time.Now()}, NewSignal(), "worker", 1, 1)
+	if err := reconciler.ReconcileDue(context.Background()); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ReconcileDue() error = %v", err)
+	}
+	if gateway.createCalls != 1 || gateway.deleteCalls != 1 {
+		t.Fatalf("create calls = %d, delete calls = %d", gateway.createCalls, gateway.deleteCalls)
 	}
 }
 

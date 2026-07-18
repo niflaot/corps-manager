@@ -66,9 +66,11 @@ func (store *Store) Complete(ctx context.Context, completion messages.Completion
 // Release records one failed attempt and clears its lease.
 func (store *Store) Release(ctx context.Context, release messages.Release) error {
 	result, err := store.pool.Exec(ctx, `UPDATE managed_messages SET state = $4, failure_count = failure_count + 1,
-		last_checked_at = $5, next_check_at = $6, lease_owner = NULL, lease_until = NULL, last_error = $7
+		last_checked_at = $5, next_check_at = $6, lease_owner = NULL, lease_until = NULL, last_error = $7,
+		discord_message_id = COALESCE(NULLIF($8, ''), discord_message_id),
+		observed_hash = COALESCE(NULLIF($9, ''), observed_hash)
 		WHERE id = $1 AND lease_owner = $2 AND revision = $3`, release.ID, release.Owner, release.Revision,
-		release.State, release.CheckedAt, release.NextCheckAt, release.Error)
+		release.State, release.CheckedAt, release.NextCheckAt, release.Error, release.DiscordMessageID, release.ObservedHash)
 	if err != nil {
 		return err
 	}

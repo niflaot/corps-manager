@@ -109,9 +109,12 @@ func (reconciler *Reconciler) reconcile(ctx context.Context, record Record) erro
 		if err == nil {
 			err = fmt.Errorf("discord response does not match Components V2 desired state")
 		}
-		return reconciler.release(ctx, record, now, err)
+		return reconciler.releaseObserved(ctx, record, now, observed, hash, err)
 	}
-	return reconciler.repository.Complete(ctx, Completion{ID: record.ID, Owner: reconciler.owner, Revision: record.Revision, DiscordMessageID: observed.ID, ObservedHash: hash, Repaired: repaired, CheckedAt: now, NextCheckAt: now.Add(5 * time.Minute)})
+	completionError := reconciler.repository.Complete(ctx, Completion{ID: record.ID, Owner: reconciler.owner,
+		Revision: record.Revision, DiscordMessageID: observed.ID, ObservedHash: hash, Repaired: repaired,
+		CheckedAt: now, NextCheckAt: now.Add(5 * time.Minute)})
+	return reconciler.cleanupStaleCreate(ctx, record, observed, completionError)
 }
 
 func (reconciler *Reconciler) ensure(ctx context.Context, record Record) (ObservedMessage, bool, error) {
@@ -158,6 +161,11 @@ func (reconciler *Reconciler) create(ctx context.Context, record Record) (Observ
 }
 
 func (reconciler *Reconciler) release(ctx context.Context, record Record, now time.Time, err error) error {
+	return reconciler.releaseObserved(ctx, record, now, ObservedMessage{}, "", err)
+}
+
+func (reconciler *Reconciler) releaseObserved(ctx context.Context, record Record, now time.Time,
+	observed ObservedMessage, observedHash string, err error) error {
 	state := StateDrifted
 	delay := retryDelay(record.ID, record.FailureCount)
 	if errors.Is(err, ErrForbidden) || errors.Is(err, ErrOwnership) || errors.Is(err, ErrInvalidRemote) || errors.Is(err, ErrInvalidAssignment) || errors.Is(err, ErrAmbiguousCreate) {
@@ -168,7 +176,22 @@ func (reconciler *Reconciler) release(ctx context.Context, record Record, now ti
 	if len(message) > 1000 {
 		message = message[:1000]
 	}
-	return reconciler.repository.Release(ctx, Release{ID: record.ID, Owner: reconciler.owner, Revision: record.Revision, State: state, Error: message, CheckedAt: now, NextCheckAt: now.Add(delay)})
+	releaseError := reconciler.repository.Release(ctx, Release{ID: record.ID, Owner: reconciler.owner, Revision: record.Revision,
+		State: state, Error: message, DiscordMessageID: observed.ID, ObservedHash: observedHash,
+		CheckedAt: now, NextCheckAt: now.Add(delay)})
+	return reconciler.cleanupStaleCreate(ctx, record, observed, releaseError)
+}
+
+func (reconciler *Reconciler) cleanupStaleCreate(ctx context.Context, record Record,
+	observed ObservedMessage, operationError error) error {
+	if !errors.Is(operationError, ErrConflict) || record.DiscordMessageID != "" || observed.ID == "" {
+		return operationError
+	}
+	deleteError := reconciler.gateway.Delete(ctx, record.ChannelID, observed.ID)
+	if deleteError == nil || errors.Is(deleteError, ErrNotFound) {
+		return operationError
+	}
+	return errors.Join(operationError, deleteError)
 }
 
 func retryDelay(id string, failures int) time.Duration {

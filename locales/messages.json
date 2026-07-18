@@ -1,10 +1,10 @@
 {
-  "verification.success": "Te verificaste correctamente como {group}.",
-  "verification.success_short": "Tu verificación fue aplicada correctamente.",
-  "verification.unverify": "Anular verificación",
-  "verification.removed": "Tu verificación fue anulada.",
-  "verification.failed": "No fue posible actualizar tu verificación. Contacta a un administrador.",
-  "verification.processing": "Procesando tu verificación…",
-  "verification.unavailable": "No hay grupos de verificación disponibles en este momento.",
-  "verification.trap.warning": "Protección anti bots: si escribes aquí serás baneado automáticamente."
+  "verification.success": "✅ Te verificaste correctamente como **{group}**.",
+  "verification.success_short": "✅ Tu verificación fue aplicada correctamente.",
+  "verification.unverify": "❌ ANULAR VERIFICACIÓN",
+  "verification.removed": "↩️ Tu verificación fue anulada.",
+  "verification.failed": "⚠️ No fue posible actualizar tu verificación. Contacta a un administrador.",
+  "verification.processing": "⏳ Procesando tu verificación…",
+  "verification.unavailable": "⚠️ No hay grupos de verificación disponibles en este momento.",
+  "verification.trap.warning": "🤖 Protección anti bots: si escribes aquí serás baneado automáticamente."
 }

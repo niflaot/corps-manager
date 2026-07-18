@@ -142,6 +142,8 @@ func (payload Payload) Normalize() Payload {
 
 func normalizeComponentValue(component map[string]any) {
 	delete(component, "id")
+	deleteFalseComponentField(component, "disabled")
+	deleteFalseComponentField(component, "spoiler")
 	if children, ok := component["components"].([]any); ok {
 		for _, child := range children {
 			if object, objectOK := child.(map[string]any); objectOK {
@@ -151,6 +153,19 @@ func normalizeComponentValue(component map[string]any) {
 	}
 	if accessory, ok := component["accessory"].(map[string]any); ok {
 		normalizeComponentValue(accessory)
+	}
+	if items, ok := component["items"].([]any); ok {
+		for _, item := range items {
+			if object, objectOK := item.(map[string]any); objectOK {
+				deleteFalseComponentField(object, "spoiler")
+			}
+		}
+	}
+}
+
+func deleteFalseComponentField(component map[string]any, field string) {
+	if value, ok := component[field].(bool); ok && !value {
+		delete(component, field)
 	}
 }
 
