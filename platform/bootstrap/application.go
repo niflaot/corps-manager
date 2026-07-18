@@ -15,6 +15,7 @@ import (
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/clock"
 	"github.com/pixelados-net/discord-bot/platform/discord"
+	"github.com/pixelados-net/discord-bot/platform/events"
 	"github.com/pixelados-net/discord-bot/platform/health"
 	"github.com/pixelados-net/discord-bot/platform/httpapi"
 	"github.com/pixelados-net/discord-bot/platform/logger"
@@ -27,6 +28,7 @@ import (
 // Application owns the fully wired process and its infrastructure.
 type Application struct {
 	discord    *discord.Client
+	events     *events.Bus
 	postgres   *postgres.Pool
 	redis      *redisplatform.Client
 	scheduler  *cronjob.Scheduler
@@ -92,9 +94,11 @@ func New(ctx context.Context, version string) (*Application, error) {
 		_ = redisClient.Close()
 		return nil, err
 	}
+	eventBus := events.New(ctx, log)
 	application := httpapi.New(log, config, apiConfig, healthService, httpapi.Dependencies{Messages: messageService}, version)
 	return &Application{
 		discord:    discordClient,
+		events:     eventBus,
 		postgres:   postgresPool,
 		redis:      redisClient,
 		scheduler:  scheduler,
@@ -102,6 +106,11 @@ func New(ctx context.Context, version string) (*Application, error) {
 		server:     httpapi.NewServer(application, config, log, version),
 		log:        log,
 	}, nil
+}
+
+// Events returns the process-local application event bus.
+func (application *Application) Events() *events.Bus {
+	return application.events
 }
 
 // Run starts the HTTP server, Discord gateway, and cron scheduler concurrently.
@@ -117,6 +126,7 @@ func (application *Application) Run(ctx context.Context) error {
 // Close releases the database, cache, and logger resources once.
 func (application *Application) Close() {
 	application.closeOnce.Do(func() {
+		application.events.Close()
 		application.postgres.Close()
 		if err := application.redis.Close(); err != nil {
 			application.log.Warn("close redis", zap.Error(err))

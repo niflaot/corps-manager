@@ -5,7 +5,7 @@
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
 
-`discord-bot` is a production-oriented Go boilerplate for one Discord bot. It includes DiscordGo, a Fiber API with Scalar documentation, Redis and PostgreSQL adapters, Liquibase migrations, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
+`discord-bot` is a production-oriented Go boilerplate for one Discord bot. It includes DiscordGo, an injected local event bus, a Fiber API with Scalar documentation, Redis and PostgreSQL adapters, Liquibase migrations, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
 
 Its first domain item is `messages`: PostgreSQL-backed static text/embed definitions assigned to Discord channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support.
 
@@ -50,6 +50,22 @@ curl -X POST http://127.0.0.1:3100/api/messages \
 
 API writes are asynchronous with respect to Discord. Inspect `state`, `desiredHash`, `observedHash`, and `lastError`, or call `POST /api/messages/{key}/reconcile` to schedule an immediate check. Channel reassignments and archival deliberately leave the previous remote message untouched in v1.
 
+## Local events
+
+`platform/events` wraps `github.com/mariuswilms/bus` as a context-bound, injected event bus. Event names use lowercase dot-separated segments. Subscriptions are asynchronous and exact-name by default:
+
+```go
+unsubscribe, err := eventBus.Subscribe(ctx, "messages.reconciled", func(ctx context.Context, event events.Event) error {
+	messageKey := event.Payload.(string)
+	return handleReconciledMessage(ctx, messageKey)
+})
+defer unsubscribe()
+
+_, err = eventBus.Publish("messages.reconciled", "rules")
+```
+
+The local bus is best-effort and scoped to one process. Use PostgreSQL or Redis when delivery must be durable or shared across replicas.
+
 Print the application version with:
 
 ```sh
@@ -62,6 +78,7 @@ go run ./cmd --version
 - `internal/messages/` contains static-message domain logic and its PostgreSQL adapter.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
 - `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.
+- `platform/events/` wraps the process-local event bus.
 - `platform/httpapi/` contains Fiber, Scalar, OpenAPI, and graceful HTTP shutdown.
 - `platform/redis/` and `platform/postgres/` contain reusable infrastructure clients.
 - `platform/clock/` provides real and deterministic clocks.

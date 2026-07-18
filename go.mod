@@ -9,6 +9,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
+	github.com/mariuswilms/bus v0.8.4
 	github.com/redis/go-redis/v9 v9.21.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.28.0
