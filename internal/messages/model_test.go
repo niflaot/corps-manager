@@ -56,6 +56,16 @@ func TestPayloadHashIgnoresMediaGalleryDefaultSpoiler(t *testing.T) {
 	}
 }
 
+func TestPayloadHashIgnoresDiscordThumbnailMetadata(t *testing.T) {
+	desired := Payload{Components: []Component{Component(`{"type":11,"media":{"url":"https://example.com/image.png"},"description":"Pixelados"}`)}}
+	observed := Payload{Components: []Component{Component(`{"type":11,"id":4,"media":{"id":"asset","url":"https://example.com/image.png","proxy_url":"https://cdn.example.com/image.png","width":1920,"height":1920},"description":"Pixelados","spoiler":false}`)}}
+	desiredHash, desiredError := desired.Hash()
+	observedHash, observedError := observed.Hash()
+	if desiredError != nil || observedError != nil || desiredHash != observedHash {
+		t.Fatalf("hashes = %q %q, errors = %v %v", desiredHash, observedHash, desiredError, observedError)
+	}
+}
+
 func TestDefinitionValidation(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -154,6 +154,9 @@ func normalizeComponentValue(component map[string]any) {
 	if accessory, ok := component["accessory"].(map[string]any); ok {
 		normalizeComponentValue(accessory)
 	}
+	if media, ok := component["media"].(map[string]any); ok {
+		normalizeMediaValue(media)
+	}
 	if items, ok := component["items"].([]any); ok {
 		for _, item := range items {
 			if object, objectOK := item.(map[string]any); objectOK {
@@ -161,6 +164,15 @@ func normalizeComponentValue(component map[string]any) {
 			}
 		}
 	}
+}
+
+func normalizeMediaValue(media map[string]any) {
+	url, ok := media["url"].(string)
+	if !ok {
+		return
+	}
+	clear(media)
+	media["url"] = url
 }
 
 func deleteFalseComponentField(component map[string]any, field string) {

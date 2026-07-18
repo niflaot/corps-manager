@@ -40,7 +40,7 @@ jobs:
             --arg author "$commit_author" \
             '{
               embeds: [{
-                title: ("New version flagged " + $tag),
+                title: ("discord - new version flagged " + $tag),
                 url: $url,
                 description: $message,
                 color: 5814783,
