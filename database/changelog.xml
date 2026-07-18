@@ -6,4 +6,6 @@
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <include file="../internal/messages/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="../internal/settings/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="../internal/verification/postgres/changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

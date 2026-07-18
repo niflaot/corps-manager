@@ -28,7 +28,7 @@ func TestStoreLifecycleIntegration(t *testing.T) {
 	store := NewStore(pool)
 	definition := messages.Definition{
 		Key: "rules", GuildID: "123", ChannelID: "456",
-		Payload: messages.Payload{Content: "Rules", Embeds: []messages.Embed{}, AllowedMentions: messages.AllowedMentions{Parse: []string{}}},
+		Payload: messages.Payload{Components: []messages.Component{messages.Component(`{"type":10,"content":"Rules"}`)}, AllowedMentions: messages.AllowedMentions{Parse: []string{}}},
 	}
 	idempotency := messages.Idempotency{Key: "create-1", Operation: "create:rules", RequestHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	created, err := store.Create(ctx, definition, idempotency)
@@ -39,7 +39,7 @@ func TestStoreLifecycleIntegration(t *testing.T) {
 	if err != nil || !replayed.Replay || replayed.Record.ID != created.Record.ID {
 		t.Fatalf("replay = %#v, error = %v", replayed, err)
 	}
-	definition.Payload.Content = "Updated rules"
+	definition.Payload.Components[0] = messages.Component(`{"type":10,"content":"Updated rules"}`)
 	replaced, err := store.Replace(ctx, "rules", 1, definition, messages.Idempotency{Key: "replace-1", Operation: "replace:rules", RequestHash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"})
 	if err != nil || replaced.Record.Revision != 2 {
 		t.Fatalf("Replace() = %#v, error = %v", replaced, err)

@@ -3,10 +3,15 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strconv"
 
 	"github.com/gofiber/contrib/fiberzap"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/pixelados-net/discord-bot/internal/settings"
+	"github.com/pixelados-net/discord-bot/internal/verification"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/health"
 	"go.uber.org/zap"
@@ -28,10 +33,52 @@ type MessageService interface {
 	Reconcile(context.Context, string) error
 }
 
+// SettingService contains HTTP-facing setting use cases.
+type SettingService interface {
+	// Get returns one effective setting.
+	Get(context.Context, settings.Key) (settings.Record, error)
+	// List returns all effective settings.
+	List(context.Context) ([]settings.Record, error)
+	// Set persists one typed setting.
+	Set(context.Context, settings.Key, json.RawMessage, uint64) (settings.Record, error)
+	// Reset deletes one setting override.
+	Reset(context.Context, settings.Key, uint64) (settings.Record, error)
+}
+
+// VerificationService contains HTTP-facing verification use cases.
+type VerificationService interface {
+	// CreateGroup creates one verification group.
+	CreateGroup(context.Context, verification.Group) (verification.Group, error)
+	// UpdateGroup replaces one verification group.
+	UpdateGroup(context.Context, string, uint64, verification.Group) (verification.Group, error)
+	// GetGroup returns one verification group.
+	GetGroup(context.Context, string) (verification.Group, error)
+	// ListGroups returns verification groups.
+	ListGroups(context.Context, bool) ([]verification.Group, error)
+	// DeleteGroup removes one verification group.
+	DeleteGroup(context.Context, string, uint64) error
+	// ListMemberships returns active memberships.
+	ListMemberships(context.Context, string) (verification.Page, error)
+	// ReconcileMemberships repairs persisted membership and Discord role state.
+	ReconcileMemberships(context.Context) error
+}
+
+// VerificationGuard contains the manual guard reconciliation use case.
+type VerificationGuard interface {
+	// Reconcile repairs verification guard state.
+	Reconcile(context.Context) error
+}
+
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
 	// Messages manages static Discord message definitions.
 	Messages MessageService
+	// Settings manages SQL-backed application settings.
+	Settings SettingService
+	// Verification manages groups and membership inspection.
+	Verification VerificationService
+	// VerificationGuard repairs Discord verification guard state.
+	VerificationGuard VerificationGuard
 }
 
 // ErrorResponse is a JSON error response body.
@@ -74,4 +121,90 @@ func errorHandler(ctx *fiber.Ctx, err error) error {
 		code = fiberError.Code
 	}
 	return ctx.Status(code).JSON(ErrorResponse{Error: err.Error()})
+}
+
+func registerSettingRoutes(router fiber.Router, service SettingService) {
+	router.Get("/", listSettings(service))
+	router.Get("/:key", getSetting(service))
+	router.Put("/:key", setSetting(service))
+	router.Delete("/:key", resetSetting(service))
+}
+
+func listSettings(service SettingService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		records, err := service.List(ctx.UserContext())
+		if err != nil {
+			return settingError(err)
+		}
+		return ctx.JSON(fiber.Map{"items": records})
+	}
+}
+
+func getSetting(service SettingService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		record, err := service.Get(ctx.UserContext(), settings.Key(ctx.Params("key")))
+		if err != nil {
+			return settingError(err)
+		}
+		if record.Revision > 0 {
+			ctx.Set(fiber.HeaderETag, strconv.FormatUint(record.Revision, 10))
+		}
+		return ctx.JSON(record)
+	}
+}
+
+func setSetting(service SettingService) fiber.Handler {
+	type request struct {
+		Value json.RawMessage `json:"value"`
+	}
+	return func(ctx *fiber.Ctx) error {
+		var body request
+		if err := decodeStrict(ctx.Body(), &body); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+		revision := uint64(0)
+		if raw := ctx.Get(fiber.HeaderIfMatch); raw != "" {
+			parsed, err := parseRevision(raw)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, err.Error())
+			}
+			revision = parsed
+		}
+		record, err := service.Set(ctx.UserContext(), settings.Key(ctx.Params("key")), body.Value, revision)
+		if err != nil {
+			return settingError(err)
+		}
+		return ctx.JSON(record)
+	}
+}
+
+func resetSetting(service SettingService) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		revision := uint64(0)
+		if raw := ctx.Get(fiber.HeaderIfMatch); raw != "" {
+			parsed, err := parseRevision(raw)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, err.Error())
+			}
+			revision = parsed
+		}
+		record, err := service.Reset(ctx.UserContext(), settings.Key(ctx.Params("key")), revision)
+		if err != nil {
+			return settingError(err)
+		}
+		return ctx.JSON(record)
+	}
+}
+
+func settingError(err error) error {
+	switch {
+	case errors.Is(err, settings.ErrInvalid):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, settings.ErrNotFound):
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, settings.ErrConflict):
+		return fiber.NewError(fiber.StatusConflict, err.Error())
+	default:
+		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+	}
 }

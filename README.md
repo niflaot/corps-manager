@@ -7,7 +7,7 @@
 
 `discord-bot` is a production-oriented Go boilerplate for one Discord bot. It includes DiscordGo, an injected local event bus, a Fiber API with Scalar documentation, Redis and PostgreSQL adapters, Liquibase migrations, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
 
-Its first domain item is `messages`: PostgreSQL-backed static text/embed definitions assigned to Discord channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support.
+Its first domain item is `messages`: PostgreSQL-backed Discord Components V2 definitions assigned to channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support. The verification guard adds SQL-backed settings, up to five role groups, timestamped multi-memberships, localized DMs with unverify buttons, read-only verification markup, and an automatically repaired anti-bot trap channel.
 
 ## Run
 
@@ -16,7 +16,16 @@ cp .env.example .env
 go run ./cmd serve
 ```
 
-`DISCORD_BOT_TOKEN` and `DISCORD_BOT_API_KEY` are mandatory. The process rejects startup before opening the HTTP server or Discord gateway when either is invalid.
+`DISCORD_BOT_TOKEN`, `DISCORD_BOT_GUILD_ID`, and `DISCORD_BOT_API_KEY` are mandatory. Before opening Fiber or the gateway, the process authenticates through Discord REST, requires the bot to belong exclusively to that guild, and requires `ADMINISTRATOR` there. Enable **Server Members Intent** under the application's Bot settings in the Discord Developer Portal; Discord requires this privileged intent for member join and removal events. `DISCORD_BOT_LOCALES_PATH` optionally points to a replacement JSON catalog; the embedded [`locales/messages.json`](locales/messages.json) is the default.
+
+Logging is configured independently from the environment:
+
+```dotenv
+DISCORD_BOT_LOG_LEVEL=info
+DISCORD_BOT_LOG_FORMAT=console
+```
+
+`DISCORD_BOT_LOG_LEVEL` accepts Zap levels such as `debug`, `info`, `warn`, and `error`. `DISCORD_BOT_LOG_FORMAT` accepts `console` for local readability or `json` for structured ingestion.
 
 The public endpoints are:
 
@@ -24,7 +33,7 @@ The public endpoints are:
 - `GET /docs` for the Scalar API reference.
 - `GET /openapi.json` for the OpenAPI document.
 
-Every `/api/messages` route requires `Authorization: Bearer <DISCORD_BOT_API_KEY>`. Mutations also use `Idempotency-Key`; replacements and archival require the current numeric revision in `If-Match`. The full CRUD, assignment, reconciliation, schemas, and response contract is available at `/docs`.
+Every `/api` route requires `Authorization: Bearer <DISCORD_BOT_API_KEY>`. Message mutations also use `Idempotency-Key`; replacements and archival require the current numeric revision in `If-Match`. Settings use dotted keys and support `GET`, revision-aware `PUT`, and `DELETE` reset. Verification groups, memberships, and manual reconciliation live under `/api/verification`. The full contract is available at `/docs`.
 
 ## Database
 
@@ -45,10 +54,27 @@ curl -X POST http://127.0.0.1:3100/api/messages \
   -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
   -H "Idempotency-Key: rules-v1" \
   -H "Content-Type: application/json" \
-  -d '{"key":"rules","guildId":"123456789012345678","channelId":"234567890123456789","payload":{"content":"Server rules","embeds":[],"allowedMentions":{"parse":[]}}}'
+  -d '{"key":"verification","guildId":"123456789012345678","channelId":"234567890123456789","payload":{"components":[{"type":10,"content":"Choose your verification groups"}],"allowedMentions":{"parse":[]}}}'
 ```
 
-API writes are asynchronous with respect to Discord. Inspect `state`, `desiredHash`, `observedHash`, and `lastError`, or call `POST /api/messages/{key}/reconcile` to schedule an immediate check. Channel reassignments and archival deliberately leave the previous remote message untouched in v1.
+Select that managed message and create a verification group:
+
+```sh
+curl -X PUT http://127.0.0.1:3100/api/settings/verification.message.key \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"value":"verification"}'
+
+curl -X POST http://127.0.0.1:3100/api/verification/groups \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"key":"member","roleId":"345678901234567890","buttonLabel":"Member","buttonEmoji":"✅","buttonStyle":3,"position":1,"enabled":true}'
+
+curl -X POST http://127.0.0.1:3100/api/verification/reconcile \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+```
+
+The target role must exist, be non-managed, and remain below the bot's highest role. Users may hold several verification memberships simultaneously. Repeating verification is idempotent; unverify removes only the selected role and hard-deletes that membership. Leaving the guild invalidates every membership. Join/remove events reconcile immediately, while the periodic audit compares Discord's current `joined_at` with each `verified_at`, deletes stale records missed during downtime, and restores missing roles for current records. Discord privacy settings can prevent a DM, but never roll back a successful role and membership.
+
+API message writes are asynchronous with respect to Discord. Inspect `state`, `desiredHash`, `observedHash`, and `lastError`, or schedule immediate reconciliation. Components V2 disables legacy `content` and `embeds`; the API validates Discord component nesting, button constraints, and the 40-component message limit before persistence.
 
 ## Local events
 
@@ -76,13 +102,16 @@ go run ./cmd --version
 
 - `cmd/` contains the process entrypoint.
 - `internal/messages/` contains static-message domain logic and its PostgreSQL adapter.
+- `internal/settings/` contains typed dotted settings and code defaults.
+- `internal/verification/` contains role groups, memberships, and the guard reconciler.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
 - `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.
 - `platform/events/` wraps the process-local event bus.
 - `platform/httpapi/` contains Fiber, Scalar, OpenAPI, and graceful HTTP shutdown.
 - `platform/redis/` and `platform/postgres/` contain reusable infrastructure clients.
 - `platform/clock/` provides real and deterministic clocks.
-- `platform/bootstrap/` owns dependency wiring and lifecycle.
+- `platform/bootstrap/` composes focused Uber Fx modules and owns concurrent runtime startup.
+- Every DI-enabled domain and adapter owns its `module.go`; bootstrap only composes those modules and owns the concurrent runtime.
 - `e2e/` builds the real binary and validates the base wiring through HTTP.
 - `database/` contains the root Liquibase changelog and configuration templates.
 
@@ -92,6 +121,7 @@ go run ./cmd --version
 test -z "$(gofmt -l .)"
 go test ./...
 go vet ./...
+staticcheck ./...
 go test ./... -race
 go build -trimpath -o /tmp/discord-bot ./cmd
 docker build -t ghcr.io/pixelados-net/discord-bot:local .

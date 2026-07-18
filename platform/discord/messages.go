@@ -13,16 +13,20 @@ import (
 
 // MessageGateway adapts the configured Discord session to managed messages.
 type MessageGateway struct {
-	client *Client
+	client  *Client
+	guildID string
 }
 
-// NewMessageGateway creates a managed-message Discord adapter.
-func NewMessageGateway(client *Client) *MessageGateway {
-	return &MessageGateway{client: client}
+// NewMessageGateway creates a guild-scoped managed-message Discord adapter.
+func NewMessageGateway(client *Client, guildID string) *MessageGateway {
+	return &MessageGateway{client: client, guildID: guildID}
 }
 
-// ValidateAssignment verifies that one channel belongs to the desired guild.
+// ValidateAssignment verifies that one channel belongs to the configured guild.
 func (gateway *MessageGateway) ValidateAssignment(ctx context.Context, guildID string, channelID string) error {
+	if guildID != gateway.guildID {
+		return messages.ErrInvalidAssignment
+	}
 	channel, err := gateway.client.session.Channel(channelID, discordgo.WithContext(ctx))
 	if err != nil {
 		mapped := mapMessageError(err)
@@ -31,7 +35,7 @@ func (gateway *MessageGateway) ValidateAssignment(ctx context.Context, guildID s
 		}
 		return mapped
 	}
-	if channel.GuildID != guildID {
+	if channel.GuildID != gateway.guildID {
 		return messages.ErrInvalidAssignment
 	}
 	return nil
@@ -46,21 +50,19 @@ func (gateway *MessageGateway) Get(ctx context.Context, channelID string, messag
 	return gateway.observe(ctx, message)
 }
 
-// Create sends one message with an enforced Discord nonce.
+// Create sends one Components V2 message with an enforced Discord nonce.
 func (gateway *MessageGateway) Create(ctx context.Context, request messages.CreateRequest) (messages.ObservedMessage, error) {
+	components, err := toDiscordComponents(request.Payload.Components)
+	if err != nil {
+		return messages.ObservedMessage{}, fmt.Errorf("%w: %v", messages.ErrInvalidRemote, err)
+	}
 	payload := struct {
-		Content         string                            `json:"content,omitempty"`
-		Embeds          []*discordgo.MessageEmbed         `json:"embeds"`
+		Components      []discordgo.MessageComponent      `json:"components"`
 		AllowedMentions *discordgo.MessageAllowedMentions `json:"allowed_mentions"`
+		Flags           discordgo.MessageFlags            `json:"flags"`
 		Nonce           string                            `json:"nonce"`
 		EnforceNonce    bool                              `json:"enforce_nonce"`
-	}{
-		Content:         request.Payload.Content,
-		Embeds:          toDiscordEmbeds(request.Payload.Embeds),
-		AllowedMentions: toDiscordMentions(request.Payload.AllowedMentions),
-		Nonce:           request.Nonce,
-		EnforceNonce:    true,
-	}
+	}{components, toDiscordMentions(request.Payload.AllowedMentions), discordgo.MessageFlagsIsComponentsV2, request.Nonce, true}
 	endpoint := discordgo.EndpointChannelMessages(request.ChannelID)
 	response, err := gateway.client.session.RequestWithBucketID(http.MethodPost, endpoint, payload, endpoint, discordgo.WithContext(ctx))
 	if err != nil {
@@ -74,24 +76,17 @@ func (gateway *MessageGateway) Create(ctx context.Context, request messages.Crea
 	if err := json.Unmarshal(response, &created); err != nil {
 		return messages.ObservedMessage{}, fmt.Errorf("%w: decode Discord create response", messages.ErrAmbiguousCreate)
 	}
-	observed, err := gateway.observe(ctx, &created)
-	if err != nil {
-		return messages.ObservedMessage{}, fmt.Errorf("%w: verify Discord create response", messages.ErrAmbiguousCreate)
-	}
-	return observed, nil
+	return gateway.observe(ctx, &created)
 }
 
-// Replace completely replaces managed content and embeds.
+// Replace completely replaces managed Components V2 state.
 func (gateway *MessageGateway) Replace(ctx context.Context, request messages.ReplaceRequest) (messages.ObservedMessage, error) {
-	content := request.Payload.Content
-	embeds := toDiscordEmbeds(request.Payload.Embeds)
-	edit := &discordgo.MessageEdit{
-		ID:              request.MessageID,
-		Channel:         request.ChannelID,
-		Content:         &content,
-		Embeds:          &embeds,
-		AllowedMentions: toDiscordMentions(request.Payload.AllowedMentions),
+	components, err := toDiscordComponents(request.Payload.Components)
+	if err != nil {
+		return messages.ObservedMessage{}, fmt.Errorf("%w: %v", messages.ErrInvalidRemote, err)
 	}
+	edit := &discordgo.MessageEdit{ID: request.MessageID, Channel: request.ChannelID, Components: &components,
+		AllowedMentions: toDiscordMentions(request.Payload.AllowedMentions), Flags: discordgo.MessageFlagsIsComponentsV2}
 	message, err := gateway.client.session.ChannelMessageEditComplex(edit, discordgo.WithContext(ctx))
 	if err != nil {
 		return messages.ObservedMessage{}, mapMessageError(err)
@@ -109,63 +104,32 @@ func (gateway *MessageGateway) observe(ctx context.Context, message *discordgo.M
 	if err != nil {
 		return messages.ObservedMessage{}, err
 	}
+	components := make([]messages.Component, len(message.Components))
+	for index, component := range message.Components {
+		components[index], err = messages.DecodeComponent(component)
+		if err != nil {
+			return messages.ObservedMessage{}, err
+		}
+	}
 	authorID := ""
 	if message.Author != nil {
 		authorID = message.Author.ID
 	}
-	return messages.ObservedMessage{
-		ID: message.ID, GuildID: message.GuildID, ChannelID: message.ChannelID, Owned: authorID == userID,
-		Payload: messages.Payload{Content: message.Content, Embeds: fromDiscordEmbeds(message.Embeds), AllowedMentions: messages.AllowedMentions{Parse: []string{}}}.Normalize(),
-	}, nil
+	return messages.ObservedMessage{ID: message.ID, GuildID: message.GuildID, ChannelID: message.ChannelID,
+		Owned: authorID == userID, ComponentsV2: message.Flags&discordgo.MessageFlagsIsComponentsV2 != 0,
+		Payload: messages.Payload{Components: components, AllowedMentions: messages.AllowedMentions{Parse: []string{}}}.Normalize()}, nil
 }
 
-func toDiscordEmbeds(embeds []messages.Embed) []*discordgo.MessageEmbed {
-	result := make([]*discordgo.MessageEmbed, len(embeds))
-	for index, embed := range embeds {
-		converted := &discordgo.MessageEmbed{Title: embed.Title, Description: embed.Description, URL: embed.URL, Timestamp: embed.Timestamp, Color: embed.Color}
-		if embed.Author != nil {
-			converted.Author = &discordgo.MessageEmbedAuthor{Name: embed.Author.Name, URL: embed.Author.URL, IconURL: embed.Author.IconURL}
+func toDiscordComponents(raw []messages.Component) ([]discordgo.MessageComponent, error) {
+	components := make([]discordgo.MessageComponent, len(raw))
+	for index := range raw {
+		component, err := discordgo.MessageComponentFromJSON(raw[index])
+		if err != nil {
+			return nil, err
 		}
-		if embed.Footer != nil {
-			converted.Footer = &discordgo.MessageEmbedFooter{Text: embed.Footer.Text, IconURL: embed.Footer.IconURL}
-		}
-		if embed.Image != nil {
-			converted.Image = &discordgo.MessageEmbedImage{URL: embed.Image.URL}
-		}
-		if embed.Thumbnail != nil {
-			converted.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: embed.Thumbnail.URL}
-		}
-		converted.Fields = make([]*discordgo.MessageEmbedField, len(embed.Fields))
-		for fieldIndex, field := range embed.Fields {
-			converted.Fields[fieldIndex] = &discordgo.MessageEmbedField{Name: field.Name, Value: field.Value, Inline: field.Inline}
-		}
-		result[index] = converted
+		components[index] = component
 	}
-	return result
-}
-
-func fromDiscordEmbeds(embeds []*discordgo.MessageEmbed) []messages.Embed {
-	result := make([]messages.Embed, len(embeds))
-	for index, embed := range embeds {
-		converted := messages.Embed{Title: embed.Title, Description: embed.Description, URL: embed.URL, Timestamp: embed.Timestamp, Color: embed.Color, Fields: []messages.EmbedField{}}
-		if embed.Author != nil {
-			converted.Author = &messages.EmbedAuthor{Name: embed.Author.Name, URL: embed.Author.URL, IconURL: embed.Author.IconURL}
-		}
-		if embed.Footer != nil {
-			converted.Footer = &messages.EmbedFooter{Text: embed.Footer.Text, IconURL: embed.Footer.IconURL}
-		}
-		if embed.Image != nil {
-			converted.Image = &messages.EmbedMedia{URL: embed.Image.URL}
-		}
-		if embed.Thumbnail != nil {
-			converted.Thumbnail = &messages.EmbedMedia{URL: embed.Thumbnail.URL}
-		}
-		for _, field := range embed.Fields {
-			converted.Fields = append(converted.Fields, messages.EmbedField{Name: field.Name, Value: field.Value, Inline: field.Inline})
-		}
-		result[index] = converted
-	}
-	return result
+	return components, nil
 }
 
 func toDiscordMentions(mentions messages.AllowedMentions) *discordgo.MessageAllowedMentions {
@@ -192,10 +156,6 @@ func mapMessageError(err error) error {
 		case http.StatusTooManyRequests:
 			return messages.ErrRateLimited
 		}
-	}
-	var rateLimit discordgo.RateLimitError
-	if errors.As(err, &rateLimit) {
-		return messages.ErrRateLimited
 	}
 	return err
 }

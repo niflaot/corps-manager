@@ -15,6 +15,16 @@ func TestBaseWiringRequiresDiscordTokenE2E(t *testing.T) {
 	}
 }
 
+func TestBaseWiringRequiresDiscordGuildE2E(t *testing.T) {
+	result := runHarness(t, []string{"serve"}, "DISCORD_BOT_TOKEN=test-token", "DISCORD_BOT_GUILD_ID=")
+	if result.err == nil {
+		t.Fatal("serve succeeded without DISCORD_BOT_GUILD_ID")
+	}
+	if !strings.Contains(result.output, "DISCORD_BOT_GUILD_ID must be a Discord snowflake") {
+		t.Fatalf("output = %q", result.output)
+	}
+}
+
 func TestVersionE2E(t *testing.T) {
 	result := runHarness(t, []string{"--version"})
 	if result.err != nil {

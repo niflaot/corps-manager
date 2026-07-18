@@ -49,7 +49,7 @@ func (service *messageServiceStub) Reconcile(_ context.Context, key string) erro
 func TestMessageRoutesRequireAuthenticationAndCreate(t *testing.T) {
 	service := &messageServiceStub{}
 	application := messageTestApplication(service)
-	body := []byte(`{"key":"rules","guildId":"123","channelId":"456","payload":{"content":"Rules","embeds":[],"allowedMentions":{"parse":[]}}}`)
+	body := []byte(`{"key":"rules","guildId":"123","channelId":"456","payload":{"components":[{"type":10,"content":"Rules"}],"allowedMentions":{"parse":[]}}}`)
 	unauthorized := httptest.NewRequest(http.MethodPost, "/api/messages", bytes.NewReader(body))
 	unauthorized.Header.Set("Content-Type", "application/json")
 	response, err := application.Test(unauthorized)

@@ -32,6 +32,26 @@ const (
 	StateArchived State = "archived"
 )
 
+// Component contains one canonical Discord Components V2 object.
+type Component json.RawMessage
+
+// MarshalJSON preserves the component's JSON object representation.
+func (component Component) MarshalJSON() ([]byte, error) {
+	if !json.Valid(component) {
+		return nil, fmt.Errorf("invalid component JSON")
+	}
+	return component, nil
+}
+
+// UnmarshalJSON stores one component JSON object without base64 conversion.
+func (component *Component) UnmarshalJSON(data []byte) error {
+	if !json.Valid(data) {
+		return fmt.Errorf("invalid component JSON")
+	}
+	*component = append((*component)[:0], data...)
+	return nil
+}
+
 // AllowedMentions controls which mentions Discord may notify.
 type AllowedMentions struct {
 	// Parse contains Discord mention categories.
@@ -44,70 +64,10 @@ type AllowedMentions struct {
 	RepliedUser bool `json:"repliedUser,omitempty"`
 }
 
-// EmbedMedia contains an embed media URL.
-type EmbedMedia struct {
-	// URL is the public media URL.
-	URL string `json:"url"`
-}
-
-// EmbedAuthor contains embed author data.
-type EmbedAuthor struct {
-	// Name is the author label.
-	Name string `json:"name"`
-	// URL is the optional author link.
-	URL string `json:"url,omitempty"`
-	// IconURL is the optional author icon.
-	IconURL string `json:"iconUrl,omitempty"`
-}
-
-// EmbedFooter contains embed footer data.
-type EmbedFooter struct {
-	// Text is the footer label.
-	Text string `json:"text"`
-	// IconURL is the optional footer icon.
-	IconURL string `json:"iconUrl,omitempty"`
-}
-
-// EmbedField contains one ordered embed field.
-type EmbedField struct {
-	// Name is the field label.
-	Name string `json:"name"`
-	// Value is the field body.
-	Value string `json:"value"`
-	// Inline requests inline rendering.
-	Inline bool `json:"inline,omitempty"`
-}
-
-// Embed contains one managed rich embed.
-type Embed struct {
-	// Title is the embed title.
-	Title string `json:"title,omitempty"`
-	// Description is the embed body.
-	Description string `json:"description,omitempty"`
-	// URL is the optional title link.
-	URL string `json:"url,omitempty"`
-	// Timestamp is an optional RFC3339 timestamp.
-	Timestamp string `json:"timestamp,omitempty"`
-	// Color is an optional RGB integer.
-	Color int `json:"color,omitempty"`
-	// Footer contains optional footer data.
-	Footer *EmbedFooter `json:"footer,omitempty"`
-	// Image contains an optional large image.
-	Image *EmbedMedia `json:"image,omitempty"`
-	// Thumbnail contains an optional thumbnail.
-	Thumbnail *EmbedMedia `json:"thumbnail,omitempty"`
-	// Author contains optional author data.
-	Author *EmbedAuthor `json:"author,omitempty"`
-	// Fields contains ordered embed fields.
-	Fields []EmbedField `json:"fields"`
-}
-
-// Payload contains the managed Discord message body.
+// Payload contains a managed Discord Components V2 message body.
 type Payload struct {
-	// Content is optional message text.
-	Content string `json:"content"`
-	// Embeds contains up to ten ordered embeds.
-	Embeds []Embed `json:"embeds"`
+	// Components contains the top-level Components V2 layout.
+	Components []Component `json:"components"`
 	// AllowedMentions prevents accidental notifications.
 	AllowedMentions AllowedMentions `json:"allowedMentions"`
 }
@@ -155,17 +115,17 @@ type Record struct {
 
 // Normalize returns a stable payload representation.
 func (payload Payload) Normalize() Payload {
-	payload.Embeds = slices.Clone(payload.Embeds)
-	if payload.Embeds == nil {
-		payload.Embeds = []Embed{}
+	payload.Components = slices.Clone(payload.Components)
+	if payload.Components == nil {
+		payload.Components = []Component{}
 	}
-	for index := range payload.Embeds {
-		if parsed, err := time.Parse(time.RFC3339, payload.Embeds[index].Timestamp); err == nil {
-			payload.Embeds[index].Timestamp = parsed.Format(time.RFC3339Nano)
-		}
-		payload.Embeds[index].Fields = slices.Clone(payload.Embeds[index].Fields)
-		if payload.Embeds[index].Fields == nil {
-			payload.Embeds[index].Fields = []EmbedField{}
+	for index, component := range payload.Components {
+		var value map[string]any
+		if json.Unmarshal(component, &value) == nil {
+			normalizeComponentValue(value)
+			if encoded, err := json.Marshal(value); err == nil {
+				payload.Components[index] = Component(encoded)
+			}
 		}
 	}
 	payload.AllowedMentions.Parse = slices.Clone(payload.AllowedMentions.Parse)
@@ -177,32 +137,30 @@ func (payload Payload) Normalize() Payload {
 	if payload.AllowedMentions.Parse == nil {
 		payload.AllowedMentions.Parse = []string{}
 	}
-	if len(payload.AllowedMentions.Roles) == 0 {
-		payload.AllowedMentions.Roles = nil
-	}
-	if len(payload.AllowedMentions.Users) == 0 {
-		payload.AllowedMentions.Users = nil
-	}
 	return payload
 }
 
-func (state State) valid() bool {
-	switch state {
-	case StatePending, StateHealthy, StateDrifted, StateRepairing, StateBlocked, StateArchived:
-		return true
-	default:
-		return false
+func normalizeComponentValue(component map[string]any) {
+	delete(component, "id")
+	if children, ok := component["components"].([]any); ok {
+		for _, child := range children {
+			if object, objectOK := child.(map[string]any); objectOK {
+				normalizeComponentValue(object)
+			}
+		}
+	}
+	if accessory, ok := component["accessory"].(map[string]any); ok {
+		normalizeComponentValue(accessory)
 	}
 }
 
-// Hash returns the canonical observable payload SHA-256 digest.
+func (state State) valid() bool {
+	return state == StatePending || state == StateHealthy || state == StateDrifted || state == StateRepairing || state == StateBlocked || state == StateArchived
+}
+
+// Hash returns the canonical observable Components V2 SHA-256 digest.
 func (payload Payload) Hash() (string, error) {
-	payload = payload.Normalize()
-	observable := struct {
-		Content string  `json:"content"`
-		Embeds  []Embed `json:"embeds"`
-	}{Content: payload.Content, Embeds: payload.Embeds}
-	encoded, err := json.Marshal(observable)
+	encoded, err := json.Marshal(payload.Normalize().Components)
 	if err != nil {
 		return "", fmt.Errorf("marshal canonical message: %w", err)
 	}

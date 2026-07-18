@@ -6,4 +6,6 @@
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <include file="migrations/0001_create_managed_messages.sql" relativeToChangelogFile="true"/>
+    <include file="migrations/0002_require_components_v2.sql" relativeToChangelogFile="true"/>
+    <include file="migrations/0003_timestamp_idempotency.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

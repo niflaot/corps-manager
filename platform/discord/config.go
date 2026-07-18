@@ -13,6 +13,8 @@ import (
 type Config struct {
 	// Token authenticates the Discord bot.
 	Token string `env:"DISCORD_BOT_TOKEN"`
+	// GuildID is the only Discord guild this process may manage.
+	GuildID string `env:"DISCORD_BOT_GUILD_ID"`
 	// Intents selects the Discord gateway events consumed by the bot.
 	Intents discordgo.Intent `env:"-"`
 }
@@ -24,9 +26,13 @@ func LoadConfig() (Config, error) {
 		return Config{}, err
 	}
 	config.Token = strings.TrimSpace(config.Token)
+	config.GuildID = strings.TrimSpace(config.GuildID)
 	if config.Token == "" {
 		return Config{}, fmt.Errorf("DISCORD_BOT_TOKEN is required")
 	}
-	config.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
+	if !snowflakePattern.MatchString(config.GuildID) {
+		return Config{}, fmt.Errorf("DISCORD_BOT_GUILD_ID must be a Discord snowflake")
+	}
+	config.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages
 	return config, nil
 }

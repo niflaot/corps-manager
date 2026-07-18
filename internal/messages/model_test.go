@@ -12,17 +12,24 @@ func TestPayloadHashIsCanonicalAndObservable(t *testing.T) {
 		t.Fatalf("Hash() error = %v", err)
 	}
 	payload.AllowedMentions.Users = []string{"123"}
-	second, err := payload.Hash()
-	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
-	}
+	second, _ := payload.Hash()
 	if first != second {
-		t.Fatalf("allowed mentions changed observable hash: %q != %q", first, second)
+		t.Fatalf("allowed mentions changed observable hash")
 	}
-	payload.Content = "changed"
+	payload.Components[0] = Component(`{"type":10,"content":"changed"}`)
 	third, _ := payload.Hash()
 	if third == first {
-		t.Fatal("content change did not change hash")
+		t.Fatal("component change did not change hash")
+	}
+}
+
+func TestPayloadHashIgnoresDiscordAssignedComponentIDs(t *testing.T) {
+	withoutID := Payload{Components: []Component{Component(`{"type":1,"components":[{"type":2,"style":1,"label":"Join","custom_id":"join"}]}`)}}
+	withID := Payload{Components: []Component{Component(`{"type":1,"id":1,"components":[{"type":2,"id":2,"style":1,"label":"Join","custom_id":"join"}]}`)}}
+	first, firstErr := withoutID.Hash()
+	second, secondErr := withID.Hash()
+	if firstErr != nil || secondErr != nil || first != second {
+		t.Fatalf("hashes differ: %q %q, errors = %v %v", first, second, firstErr, secondErr)
 	}
 }
 
@@ -32,16 +39,19 @@ func TestDefinitionValidation(t *testing.T) {
 		mutate func(*Definition)
 		want   string
 	}{
-		{name: "key", mutate: func(value *Definition) { value.Key = "Bad Key" }, want: "key"},
-		{name: "snowflake", mutate: func(value *Definition) { value.ChannelID = "channel" }, want: "snowflake"},
-		{name: "empty", mutate: func(value *Definition) { value.Payload.Content = ""; value.Payload.Embeds = nil }, want: "content"},
-		{name: "content", mutate: func(value *Definition) { value.Payload.Content = strings.Repeat("x", 2001) }, want: "2000"},
-		{name: "embed total", mutate: func(value *Definition) { value.Payload.Embeds[0].Description = strings.Repeat("x", 4097) }, want: "4096"},
-		{name: "url", mutate: func(value *Definition) { value.Payload.Embeds[0].URL = "javascript:bad" }, want: "HTTP"},
-		{name: "mentions", mutate: func(value *Definition) {
+		{"key", func(value *Definition) { value.Key = "Bad Key" }, "key"},
+		{"snowflake", func(value *Definition) { value.ChannelID = "channel" }, "snowflake"},
+		{"empty", func(value *Definition) { value.Payload.Components = nil }, "at least"},
+		{"text", func(value *Definition) {
+			value.Payload.Components[0] = Component(`{"type":10,"content":"` + strings.Repeat("x", 4001) + `"}`)
+		}, "4000"},
+		{"row", func(value *Definition) {
+			value.Payload.Components = []Component{Component(`{"type":1,"components":[]}`)}
+		}, "1 to 5"},
+		{"mentions", func(value *Definition) {
 			value.Payload.AllowedMentions.Parse = []string{"roles"}
 			value.Payload.AllowedMentions.Roles = []string{"123"}
-		}, want: "overlap"},
+		}, "overlap"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -55,11 +65,7 @@ func TestDefinitionValidation(t *testing.T) {
 }
 
 func validDefinition() Definition {
-	return Definition{
-		Key: "rules", GuildID: "123456789", ChannelID: "987654321",
-		Payload: Payload{
-			Content: "Rules", Embeds: []Embed{{Title: "Welcome", Description: "Be kind", Fields: []EmbedField{}}},
-			AllowedMentions: AllowedMentions{Parse: []string{}},
-		},
-	}
+	return Definition{Key: "rules", GuildID: "123456789", ChannelID: "987654321", Payload: Payload{
+		Components: []Component{Component(`{"type":10,"content":"Rules"}`)}, AllowedMentions: AllowedMentions{Parse: []string{}},
+	}}
 }

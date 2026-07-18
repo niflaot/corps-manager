@@ -155,7 +155,7 @@ func finishIdempotency(ctx context.Context, tx pgx.Tx, key string, record messag
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE message_idempotency SET status_code = $2, response = $3 WHERE idempotency_key = $1`, key, status, response)
+	_, err = tx.Exec(ctx, `UPDATE message_idempotency SET status_code = $2, response = $3, updated_at = now() WHERE idempotency_key = $1`, key, status, response)
 	return err
 }
 

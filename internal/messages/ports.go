@@ -155,6 +155,8 @@ type ObservedMessage struct {
 	Payload Payload
 	// Owned reports whether the configured bot authored it.
 	Owned bool
+	// ComponentsV2 reports whether Discord's irreversible V2 flag is present.
+	ComponentsV2 bool
 }
 
 // CreateRequest contains an idempotent Discord creation operation.

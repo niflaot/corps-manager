@@ -49,12 +49,12 @@ func (gateway *reconcileGateway) Get(context.Context, string, string) (ObservedM
 func (gateway *reconcileGateway) Create(_ context.Context, request CreateRequest) (ObservedMessage, error) {
 	gateway.createCalls++
 	gateway.nonce = request.Nonce
-	return ObservedMessage{ID: "new", ChannelID: request.ChannelID, Payload: request.Payload, Owned: true}, nil
+	return ObservedMessage{ID: "new", ChannelID: request.ChannelID, Payload: request.Payload, Owned: true, ComponentsV2: true}, nil
 }
 
 func (gateway *reconcileGateway) Replace(_ context.Context, request ReplaceRequest) (ObservedMessage, error) {
 	gateway.replaceCalls++
-	return ObservedMessage{ID: request.MessageID, ChannelID: request.ChannelID, Payload: request.Payload, Owned: true}, nil
+	return ObservedMessage{ID: request.MessageID, ChannelID: request.ChannelID, Payload: request.Payload, Owned: true, ComponentsV2: true}, nil
 }
 
 type fixedClock struct{ now time.Time }
@@ -63,13 +63,26 @@ func (clock fixedClock) Now() time.Time { return clock.now }
 
 func TestReconcilerRepairsDrift(t *testing.T) {
 	record := reconciliationRecord(t)
-	gateway := &reconcileGateway{observed: ObservedMessage{ID: "remote", ChannelID: record.ChannelID, Payload: Payload{Content: "damaged", Embeds: []Embed{}, AllowedMentions: AllowedMentions{Parse: []string{}}}, Owned: true}}
+	gateway := &reconcileGateway{observed: ObservedMessage{ID: "remote", ChannelID: record.ChannelID, Payload: Payload{Components: []Component{Component(`{"type":10,"content":"damaged"}`)}, AllowedMentions: AllowedMentions{Parse: []string{}}}, Owned: true}}
 	repository := &reconcileRepository{record: record}
 	reconciler := NewReconciler(repository, gateway, fixedClock{time.Now()}, NewSignal(), "worker", 1, 1)
 	if err := reconciler.ReconcileDue(context.Background()); err != nil {
 		t.Fatalf("ReconcileDue() error = %v", err)
 	}
 	if gateway.replaceCalls != 1 || !repository.completion.Repaired || repository.completion.ObservedHash != record.DesiredHash {
+		t.Fatalf("replace calls = %d, completion = %#v", gateway.replaceCalls, repository.completion)
+	}
+}
+
+func TestReconcilerUpgradesMatchingLegacyComponentsToV2(t *testing.T) {
+	record := reconciliationRecord(t)
+	gateway := &reconcileGateway{observed: ObservedMessage{ID: "remote", ChannelID: record.ChannelID, Payload: record.Payload, Owned: true}}
+	repository := &reconcileRepository{record: record}
+	reconciler := NewReconciler(repository, gateway, fixedClock{time.Now()}, NewSignal(), "worker", 1, 1)
+	if err := reconciler.ReconcileDue(context.Background()); err != nil {
+		t.Fatalf("ReconcileDue() error = %v", err)
+	}
+	if gateway.replaceCalls != 1 || !repository.completion.Repaired {
 		t.Fatalf("replace calls = %d, completion = %#v", gateway.replaceCalls, repository.completion)
 	}
 }

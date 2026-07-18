@@ -105,9 +105,9 @@ func (reconciler *Reconciler) reconcile(ctx context.Context, record Record) erro
 		return reconciler.release(ctx, record, now, err)
 	}
 	hash, err := observed.Payload.Hash()
-	if err != nil || hash != record.DesiredHash {
+	if err != nil || hash != record.DesiredHash || !observed.ComponentsV2 {
 		if err == nil {
-			err = fmt.Errorf("discord response hash does not match desired state")
+			err = fmt.Errorf("discord response does not match Components V2 desired state")
 		}
 		return reconciler.release(ctx, record, now, err)
 	}
@@ -134,7 +134,7 @@ func (reconciler *Reconciler) ensure(ctx context.Context, record Record) (Observ
 	if err != nil {
 		return ObservedMessage{}, false, err
 	}
-	if hash == record.DesiredHash {
+	if hash == record.DesiredHash && observed.ComponentsV2 {
 		return observed, false, nil
 	}
 	replaced, err := reconciler.gateway.Replace(ctx, ReplaceRequest{ChannelID: record.ChannelID, MessageID: record.DiscordMessageID, Payload: record.Payload})

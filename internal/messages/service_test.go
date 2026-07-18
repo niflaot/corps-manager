@@ -29,7 +29,7 @@ func TestServiceCreatesAndTriggers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if result.Record.Revision != 1 || repository.created.Payload.Embeds == nil {
+	if result.Record.Revision != 1 || repository.created.Payload.Components == nil {
 		t.Fatalf("Create() = %#v", result)
 	}
 	select {

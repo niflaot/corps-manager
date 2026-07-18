@@ -3,11 +3,14 @@ package discord
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sync/atomic"
 
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 )
+
+var snowflakePattern = regexp.MustCompile(`^[0-9]{1,20}$`)
 
 // Client manages a Discord gateway session.
 type Client struct {
@@ -15,6 +18,7 @@ type Client struct {
 	log       *zap.Logger
 	connected atomic.Bool
 	userID    atomic.Value
+	guildID   string
 }
 
 // New creates the configured Discord bot client without opening its gateway.
@@ -24,12 +28,55 @@ func New(config Config, log *zap.Logger) (*Client, error) {
 		return nil, fmt.Errorf("create discord session: %w", err)
 	}
 	session.Identify.Intents = config.Intents
-	client := &Client{session: session, log: log}
+	client := &Client{session: session, log: log, guildID: config.GuildID}
 	client.AddHandler(func(_ *discordgo.Session, ready *discordgo.Ready) {
 		client.userID.Store(ready.User.ID)
 		log.Info("discord gateway ready", zap.String("user", ready.User.String()))
 	})
 	return client, nil
+}
+
+// GuildID returns the only configured Discord guild snowflake.
+func (client *Client) GuildID() string {
+	return client.guildID
+}
+
+// ValidateGuildAdministrator verifies exclusive guild membership and administrator permission.
+func (client *Client) ValidateGuildAdministrator(ctx context.Context) error {
+	userID, err := client.BotUserID(ctx)
+	if err != nil {
+		return fmt.Errorf("authenticate Discord bot: %w", err)
+	}
+	guilds, err := client.session.UserGuilds(200, "", "", false, discordgo.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("list Discord guilds: %w", err)
+	}
+	if len(guilds) != 1 || guilds[0].ID != client.guildID {
+		return fmt.Errorf("discord bot must belong exclusively to configured guild %s", client.guildID)
+	}
+	member, err := client.session.GuildMember(client.guildID, userID, discordgo.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("read configured guild membership: %w", err)
+	}
+	roles, err := client.session.GuildRoles(client.guildID, discordgo.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("read configured guild roles: %w", err)
+	}
+	memberRoles := make(map[string]struct{}, len(member.Roles)+1)
+	memberRoles[client.guildID] = struct{}{}
+	for _, roleID := range member.Roles {
+		memberRoles[roleID] = struct{}{}
+	}
+	var permissions int64
+	for _, role := range roles {
+		if _, ok := memberRoles[role.ID]; ok {
+			permissions |= role.Permissions
+		}
+	}
+	if permissions&discordgo.PermissionAdministrator == 0 {
+		return fmt.Errorf("discord bot requires administrator permission in guild %s", client.guildID)
+	}
+	return nil
 }
 
 // BotUserID returns the authenticated Discord bot user snowflake.
