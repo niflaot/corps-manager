@@ -30,7 +30,7 @@ func TestVersionE2E(t *testing.T) {
 	if result.err != nil {
 		t.Fatalf("version error = %v, output = %q", result.err, result.output)
 	}
-	if result.output != "discord-bot v1.1.0\n" {
+	if result.output != "discord-bot v1.1.1\n" {
 		t.Fatalf("output = %q", result.output)
 	}
 }

@@ -1,6 +1,6 @@
-# discord-bot v1.1.0
+# discord-bot v1.1.1
 
-[![Version](https://img.shields.io/badge/version-v1.1.0-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.1.0)
+[![Version](https://img.shields.io/badge/version-v1.1.1-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.1.1)
 [![CI](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml)
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
@@ -138,6 +138,12 @@ liquibase --defaults-file=database/liquibase.properties update
 
 Liquibase must run before the bot starts. The application never mutates schema at runtime.
 
+Tagged releases also publish
+`ghcr.io/pixelados-net/discord-bot-migrations:<version>`. That image contains
+the changelog from the same commit as the application image and uses Liquibase
+4.31 as its entrypoint. Deployment orchestration should run its `update`
+command to successful completion before starting the matching bot version.
+
 Create a managed message with:
 
 ```sh
@@ -191,7 +197,7 @@ go run ./cmd --version
 
 ## Release
 
-GHCR publication runs only for tags matching `v*.*.*`. The release workflow validates tests, Vet, Staticcheck and compilation, builds all supported binary targets, and then publishes the multi-architecture image. A tag such as `v1.2.3` produces `v1.2.3`, `1.2.3`, `1.2`, `1`, and `latest` image tags and embeds `1.2.3` in the binary.
+GHCR publication runs only for tags matching `v*.*.*`. The release workflow validates tests, Vet, Staticcheck and compilation, builds all supported binary targets, and then publishes matching multi-architecture application and migration images. A tag such as `v1.2.3` produces `v1.2.3`, `1.2.3`, `1.2`, `1`, and `latest` tags on both image repositories and embeds `1.2.3` in the application binary.
 
 Configure the repository Actions secret `DISCORD_WEBHOOK_URL` to enable the tag notification workflow, then publish a release with:
 

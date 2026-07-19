@@ -11,6 +11,7 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
+  MIGRATIONS_IMAGE_NAME: ghcr.io/${{ github.repository }}-migrations
 
 jobs:
   validate:
@@ -90,7 +91,7 @@ jobs:
           if-no-files-found: error
 
   ghcr:
-    name: Publish GHCR Image
+    name: Publish GHCR Images
     needs:
       - validate
       - package
@@ -127,6 +128,18 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest
 
+      - name: Generate migrations image metadata
+        id: migrations_metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.MIGRATIONS_IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -137,3 +150,13 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
             VERSION=${{ steps.release.outputs.version }}
+
+      - name: Build and push migrations
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.migrations
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.migrations_metadata.outputs.tags }}
+          labels: ${{ steps.migrations_metadata.outputs.labels }}

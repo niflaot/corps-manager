@@ -11,7 +11,7 @@ import (
 	"github.com/pixelados-net/discord-bot/platform/cli"
 )
 
-var version = "1.1.0"
+var version = "1.1.1"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
