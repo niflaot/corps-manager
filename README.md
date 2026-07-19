@@ -1,6 +1,6 @@
-# discord-bot v1.0.0
+# discord-bot v1.1.0
 
-[![Version](https://img.shields.io/badge/version-v1.0.0-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/version-v1.1.0-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.1.0)
 [![CI](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml)
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
