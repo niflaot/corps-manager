@@ -12,6 +12,7 @@ import (
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/discord"
 	"github.com/pixelados-net/discord-bot/platform/health"
+	"github.com/pixelados-net/discord-bot/platform/httpapi/linkapi"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -25,11 +26,8 @@ type Config struct {
 }
 
 // Module provides HTTP configuration, routes, Fiber application, and server.
-var Module = fx.Module("httpapi", fx.Provide(
-	LoadConfig,
-	provideDependencies,
-	provideApplication,
-	provideServer,
+var Module = fx.Module("httpapi", linkapi.Module, fx.Provide(
+	LoadConfig, provideDependencies, provideApplication, provideServer,
 ))
 
 // LoadConfig reads and validates HTTP API configuration.
@@ -49,9 +47,11 @@ func LoadConfig() (Config, error) {
 }
 
 func provideDependencies(messageService *messages.Service, settingService *settings.Service,
-	verificationService *verification.Service, guard *verification.Guard, guildGateway *discord.GuildGateway) Dependencies {
+	verificationService *verification.Service, guard *verification.Guard, guildGateway *discord.GuildGateway,
+	discordLinkRoutes *linkapi.Routes) Dependencies {
 	return Dependencies{Messages: messageService, Settings: settingService,
-		Verification: verificationService, VerificationGuard: guard, Guild: guildGateway}
+		Verification: verificationService, VerificationGuard: guard, Guild: guildGateway,
+		DiscordLinks: discordLinkRoutes}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

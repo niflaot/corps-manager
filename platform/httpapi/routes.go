@@ -26,6 +26,10 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 	if dependencies.Guild != nil {
 		application.Get("/guild/members", getGuildMemberCount(dependencies.Guild))
 	}
+	if dependencies.DiscordLinks != nil {
+		dependencies.DiscordLinks.RegisterPublic(application)
+		dependencies.DiscordLinks.RegisterPrivate(application.Group("/api/discord-links", authenticate(apiConfig.APIKey)))
+	}
 	if dependencies.Messages != nil {
 		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
 	}

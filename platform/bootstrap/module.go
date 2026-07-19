@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"github.com/pixelados-net/discord-bot/internal/cronjob"
+	"github.com/pixelados-net/discord-bot/internal/discordlinks"
+	discordlinkspostgres "github.com/pixelados-net/discord-bot/internal/discordlinks/postgres"
 	"github.com/pixelados-net/discord-bot/internal/localization"
 	"github.com/pixelados-net/discord-bot/internal/messages"
 	messagespostgres "github.com/pixelados-net/discord-bot/internal/messages/postgres"
@@ -12,6 +14,7 @@ import (
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/clock"
 	"github.com/pixelados-net/discord-bot/platform/discord"
+	"github.com/pixelados-net/discord-bot/platform/discordoauth"
 	"github.com/pixelados-net/discord-bot/platform/events"
 	"github.com/pixelados-net/discord-bot/platform/health"
 	"github.com/pixelados-net/discord-bot/platform/httpapi"
@@ -33,10 +36,13 @@ var Module = fx.Module("bootstrap",
 	messagespostgres.Module,
 	settingspostgres.Module,
 	verificationpostgres.Module,
+	discordlinkspostgres.Module,
 	discord.Module,
+	discordoauth.Module,
 	messages.Module,
 	settings.Module,
 	verification.Module,
+	discordlinks.Module,
 	health.Module,
 	cronjob.Module,
 	httpapi.Module,

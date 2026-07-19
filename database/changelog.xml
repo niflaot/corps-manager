@@ -8,4 +8,5 @@
     <include file="../internal/messages/postgres/changelog.xml" relativeToChangelogFile="true"/>
     <include file="../internal/settings/postgres/changelog.xml" relativeToChangelogFile="true"/>
     <include file="../internal/verification/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="../internal/discordlinks/postgres/changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -75,6 +75,14 @@ type GuildService interface {
 	MemberCount(context.Context) (int, int, error)
 }
 
+// DiscordLinkRoutes registers isolated public and API-key-protected account-link routes.
+type DiscordLinkRoutes interface {
+	// RegisterPublic registers the browser-facing OAuth routes.
+	RegisterPublic(fiber.Router)
+	// RegisterPrivate registers service-to-service account-link routes.
+	RegisterPrivate(fiber.Router)
+}
+
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
 	// Messages manages static Discord message definitions.
@@ -87,6 +95,8 @@ type Dependencies struct {
 	VerificationGuard VerificationGuard
 	// Guild reports public Discord guild statistics.
 	Guild GuildService
+	// DiscordLinks owns Discord OAuth redirects and account-link APIs.
+	DiscordLinks DiscordLinkRoutes
 }
 
 // ErrorResponse is a JSON error response body.

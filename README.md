@@ -36,6 +36,96 @@ Only when `DISCORD_BOT_ENVIRONMENT=development`, `GET /docs` exposes the Scalar 
 
 Every `/api` route requires `Authorization: Bearer <DISCORD_BOT_API_KEY>`. Message mutations also use `Idempotency-Key`; replacements and archival require the current numeric revision in `If-Match`. Settings use dotted keys and support `GET`, revision-aware `PUT`, and `DELETE` reset. Verification groups, memberships, and manual reconciliation live under `/api/verification`. The full contract is available at `/docs`.
 
+## Discord identity links
+
+The optional identity-link service owns Discord OAuth from authorization through token revocation. A caller owns its local sessions and supplies only a stable opaque `subject`; the bot stores the authoritative association between that subject and Discord's immutable user ID. OAuth user tokens are used only to read `/users/@me`, then revoked and discarded. Bot-token actions remain independent from user OAuth.
+
+Enable the service with:
+
+```dotenv
+DISCORD_BOT_OAUTH_ENABLED=true
+DISCORD_BOT_OAUTH_CLIENT_ID=123456789012345678
+DISCORD_BOT_OAUTH_CLIENT_SECRET=replace-me
+DISCORD_BOT_OAUTH_PUBLIC_URL=http://localhost:3100
+DISCORD_BOT_OAUTH_COMPLETION_URLS={"pixelados-links":"http://localhost:3000/configuracion/vinculos/discord/resultado","pixelados-login":"http://localhost:3000/auth/discord/resultado"}
+```
+
+Register this exact redirect URI in the Discord Developer Portal:
+
+```text
+http://localhost:3100/oauth/discord/callback
+```
+
+Production public and completion URLs must use HTTPS. Completion URLs are a startup-time allowlist keyed by `completionKey`; request bodies cannot introduce arbitrary return URLs. Only these two browser routes are public:
+
+- `GET /oauth/discord/start/{intentId}`
+- `GET /oauth/discord/callback`
+
+Intent creation, result exchange, link inspection, and unlinking remain under `/api/discord-links` and require the configured Bearer API key. Link and result creation also require `Idempotency-Key`.
+
+### Link a test user
+
+The caller assigns the local identifier. Use the immutable account ID from the caller, namespaced to avoid ambiguity; for example `user:test-001`. The service generates the link's separate internal UUID after successful OAuth.
+
+```sh
+curl -X POST http://127.0.0.1:3100/api/discord-links/intents \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H "Idempotency-Key: link-user-test-001" \
+  -H "Content-Type: application/json" \
+  -d '{"subject":"user:test-001","completionKey":"pixelados-links"}'
+```
+
+Open the returned `startUrl` in the user's browser. Discord returns to the bot, and the bot redirects to the configured Pixelados completion URL with a short-lived `code`. Pixelados must exchange that code from its backend, using the same idempotency key for every retry:
+
+```sh
+curl -X POST http://127.0.0.1:3100/api/discord-links/results/exchange \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H "Idempotency-Key: exchange-link-user-test-001" \
+  -H "Content-Type: application/json" \
+  -d '{"code":"CODE_FROM_COMPLETION_REDIRECT"}'
+```
+
+A successful result has `status: "linked"`, the original `subject`, and a `link` containing its generated `id`, Discord user ID, profile snapshot, granted scopes, status, and timestamps. A different idempotency key cannot consume the same result code again.
+
+Inspect the latest link history by caller subject:
+
+```sh
+curl http://127.0.0.1:3100/api/discord-links/subjects/user:test-001 \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+```
+
+Inspect the active owner of a Discord user ID:
+
+```sh
+curl http://127.0.0.1:3100/api/discord-links/users/123456789012345678 \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+```
+
+Unlinking is naturally idempotent by stable subject and preserves historical timestamps:
+
+```sh
+curl -X DELETE http://127.0.0.1:3100/api/discord-links/subjects/user:test-001 \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+```
+
+### Authenticate through an existing link
+
+Create a login intent without a subject. This prevents the browser from choosing which local account it wants to enter:
+
+```sh
+curl -X POST http://127.0.0.1:3100/api/discord-links/login-intents \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H "Idempotency-Key: login-attempt-001" \
+  -H "Content-Type: application/json" \
+  -d '{"completionKey":"pixelados-login"}'
+```
+
+After the same browser OAuth sequence, exchange the returned completion code. An active association returns `status: "authenticated"`, its trusted `subject`, and the current link snapshot. An unknown Discord identity returns `status: "not_linked"` and no subject. Pixelados must still validate the local account and create its own session; the bot never creates or receives Pixelados cookies.
+
+Possible result statuses are `linked`, `authenticated`, `not_linked`, `denied`, `conflict`, and `failed`. Safe `errorCode` values distinguish authorization denial, provider errors, occupied subjects, occupied Discord identities, and users that are not linked. The full request and response schemas are in `/docs` when running in development.
+
+Expired intents and result credentials are retained for seven days by default to preserve idempotent retries and short operational audit, then removed by the context-bound cron scheduler. Change this with `DISCORD_BOT_OAUTH_ARTIFACT_RETENTION`; durable link and unlink history is never removed by that cleanup.
+
 ## Database
 
 PostgreSQL migrations use the same composed Liquibase layout as `pixels`. The root changelog is `database/changelog.xml`, while `messages` owns its changelog and versioned SQL under `internal/messages/postgres/`.
@@ -116,8 +206,10 @@ git push origin v1.2.3
 - `internal/messages/` contains static-message domain logic and its PostgreSQL adapter.
 - `internal/settings/` contains typed dotted settings and code defaults.
 - `internal/verification/` contains role groups, memberships, and the guard reconciler.
+- `internal/discordlinks/` contains OAuth intent, result, login, and durable link behavior.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
 - `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.
+- `platform/discordoauth/` owns the bounded confidential OAuth HTTP client.
 - `platform/events/` wraps the process-local event bus.
 - `platform/httpapi/` contains Fiber, Scalar, OpenAPI, and graceful HTTP shutdown.
 - `platform/redis/` and `platform/postgres/` contain reusable infrastructure clients.
