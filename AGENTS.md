@@ -18,6 +18,7 @@
 - All runtime adapters and third-party SDKs must write through the injected Zap logger; do not allow dependencies to fall back to standard-library or unstructured logging.
 - Log successful recurring health checks at `debug`; log unavailable dependencies and failed checks at `error`.
 - Publish GHCR images only from semantic version tag workflows matching `v*.*.*`; tagged releases must compile and validate before image publication.
+- Before publishing a version tag, synchronize every repository version reference, including the README badge and links, runtime fallback, tests, Docker build argument, and OpenAPI document.
 - Never use magic strings for setting keys, interaction identifiers, event names, or configurable defaults; declare named constants or variables with documented defaults.
 - Do not add Docker Compose files or wiki documentation.
 - Run `gofmt`, `go test ./...`, `go vet ./...`, `staticcheck ./...`, and `go test ./... -race` before handing off changes.
