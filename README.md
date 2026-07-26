@@ -1,13 +1,13 @@
-# discord-bot v1.1.1
+# discord-bot v1.1.2
 
-[![Version](https://img.shields.io/badge/version-v1.1.1-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.1.1)
+[![Version](https://img.shields.io/badge/version-v1.1.2-5865F2.svg)](https://github.com/pixelados-net/discord-bot/releases/tag/v1.1.2)
 [![CI](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/ci.yml)
 [![Package](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml/badge.svg)](https://github.com/pixelados-net/discord-bot/actions/workflows/package.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/pixelados-net/discord-bot.svg)](https://pkg.go.dev/github.com/pixelados-net/discord-bot)
 
 `discord-bot` is a production-oriented Go boilerplate for one Discord bot. It includes DiscordGo, an injected local event bus, a Fiber API with Scalar documentation, Redis and PostgreSQL adapters, Liquibase migrations, deterministic clocks, reusable cron jobs, graceful shutdown, and a real-process E2E harness.
 
-Its first domain item is `messages`: PostgreSQL-backed Discord Components V2 definitions assigned to channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support. The verification guard adds SQL-backed settings, up to five role groups, timestamped multi-memberships, localized DMs with unverify buttons, read-only verification markup, and an automatically repaired anti-bot trap channel.
+Its first domain item is `messages`: PostgreSQL-backed Discord Components V2 definitions assigned to channels. A bounded reconciler checks integrity every minute, restores edited messages, and safely recreates missing messages with Discord's enforced nonce support. The verification guard adds SQL-backed settings, up to five role groups, timestamped multi-memberships, durable localized transition DMs, read-only verification markup, and an automatically repaired anti-bot trap channel.
 
 ## Run
 
@@ -16,7 +16,9 @@ cp .env.example .env
 go run ./cmd serve
 ```
 
-`DISCORD_BOT_TOKEN`, `DISCORD_BOT_GUILD_ID`, and `DISCORD_BOT_API_KEY` are mandatory. Before opening Fiber or the gateway, the process authenticates through Discord REST, requires the bot to belong exclusively to that guild, and requires `ADMINISTRATOR` there. Enable **Server Members Intent** under the application's Bot settings in the Discord Developer Portal; Discord requires this privileged intent for member join and removal events. `DISCORD_BOT_LOCALES_PATH` optionally points to a replacement JSON catalog; the embedded [`locales/messages.json`](locales/messages.json) is the default.
+`DISCORD_BOT_TOKEN`, `DISCORD_BOT_GUILD_ID`, and `DISCORD_BOT_API_KEY` are mandatory. Before opening Fiber or the gateway, the process authenticates through Discord REST, requires the bot to belong exclusively to that guild, and requires `ADMINISTRATOR` there. Enable **Server Members Intent** under the application's Bot settings in the Discord Developer Portal; Discord requires this privileged intent for member join and removal events.
+
+The embedded [`locales/messages.json`](locales/messages.json) catalog is the default. Set exactly one of `DISCORD_BOT_LOCALES_PATH` or `DISCORD_BOT_LOCALES_URL` to replace it at startup from a local file or HTTP(S) resource. Remote loading is bounded by `DISCORD_BOT_LOCALES_HTTP_TIMEOUT` and `DISCORD_BOT_LOCALES_MAX_BYTES`; the immutable catalog performs no runtime network reads. Verification group names use `verification.group.<group-key>`, independently from the button label, and fall back to the stable group key when a translation is absent.
 
 Logging is configured independently from the environment:
 
@@ -169,7 +171,9 @@ curl -X POST http://127.0.0.1:3100/api/verification/reconcile \
   -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
 ```
 
-The target role must exist, be non-managed, and remain below the bot's highest role. Users may hold several verification memberships simultaneously. Repeating verification is idempotent; unverify removes only the selected role and hard-deletes that membership. Leaving the guild invalidates every membership. Join/remove events reconcile immediately, while the periodic audit compares Discord's current `joined_at` with each `verified_at`, deletes stale records missed during downtime, and restores missing roles for current records. Discord privacy settings can prevent a DM, but never roll back a successful role and membership.
+The target role must exist, be non-managed, and remain below the bot's highest role. Users may hold several verification memberships simultaneously. Repeating verification is idempotent; unverify removes only the selected role and hard-deletes that membership. Leaving the guild invalidates every membership. Join/remove events reconcile immediately, while the periodic audit compares Discord's current `joined_at` with each `verified_at`, deletes stale records missed during downtime, and restores missing roles for current records.
+
+Successful verification and explicit unverification enqueue informational DMs in `verification_notification_outbox`. The membership UUID and transition kind form a unique idempotency key, while each Discord request uses a stable enforced nonce, so retries after uncertain responses do not duplicate messages. Delivery runs immediately when possible and through a periodic bounded sweep. Failures use exponential backoff with deterministic jitter; after `DISCORD_BOT_VERIFICATION_NOTIFICATIONS_MAX_ATTEMPTS`, the durable row remains in state `dead` as the DLQ. Discord privacy settings or delivery failures never roll back roles or memberships. Tune the worker, lease, retry, and sweep settings through the `DISCORD_BOT_VERIFICATION_NOTIFICATIONS_*` variables documented in `.env.example`.
 
 API message writes are asynchronous with respect to Discord. Inspect `state`, `desiredHash`, `observedHash`, and `lastError`, or schedule immediate reconciliation. Components V2 disables legacy `content` and `embeds`; the API validates Discord component nesting, button constraints, and the 40-component message limit before persistence.
 
@@ -211,7 +215,7 @@ git push origin v1.2.3
 - `cmd/` contains the process entrypoint.
 - `internal/messages/` contains static-message domain logic and its PostgreSQL adapter.
 - `internal/settings/` contains typed dotted settings and code defaults.
-- `internal/verification/` contains role groups, memberships, and the guard reconciler.
+- `internal/verification/` contains role groups, memberships, the guard reconciler, and the durable notification outbox.
 - `internal/discordlinks/` contains OAuth intent, result, login, and durable link behavior.
 - `internal/cronjob/` contains the reusable asynchronous scheduler.
 - `platform/discord/` wraps the single DiscordGo session and exposes it for bot handlers.

@@ -10,10 +10,13 @@ import (
 	"github.com/pixelados-net/discord-bot/internal/settings"
 	settingspostgres "github.com/pixelados-net/discord-bot/internal/settings/postgres"
 	"github.com/pixelados-net/discord-bot/internal/verification"
+	verificationnotification "github.com/pixelados-net/discord-bot/internal/verification/notification"
+	verificationnotificationpostgres "github.com/pixelados-net/discord-bot/internal/verification/notification/postgres"
 	verificationpostgres "github.com/pixelados-net/discord-bot/internal/verification/postgres"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/clock"
 	"github.com/pixelados-net/discord-bot/platform/discord"
+	discordnotification "github.com/pixelados-net/discord-bot/platform/discord/notification"
 	"github.com/pixelados-net/discord-bot/platform/discordoauth"
 	"github.com/pixelados-net/discord-bot/platform/events"
 	"github.com/pixelados-net/discord-bot/platform/health"
@@ -36,11 +39,14 @@ var Module = fx.Module("bootstrap",
 	messagespostgres.Module,
 	settingspostgres.Module,
 	verificationpostgres.Module,
+	verificationnotificationpostgres.Module,
 	discordlinkspostgres.Module,
 	discord.Module,
+	discordnotification.Module,
 	discordoauth.Module,
 	messages.Module,
 	settings.Module,
+	verificationnotification.Module,
 	verification.Module,
 	discordlinks.Module,
 	health.Module,

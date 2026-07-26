@@ -63,6 +63,8 @@ jobs:
         run: go vet ./...
 
       - name: Staticcheck
+        env:
+          GOTOOLCHAIN: local
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
 
       - name: Upload coverage

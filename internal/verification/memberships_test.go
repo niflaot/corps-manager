@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/pixelados-net/discord-bot/internal/verification/notification"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 func TestReconcileMemberDeletesDepartedMembership(t *testing.T) {
 	membership := testMembership(time.Now().Add(-time.Hour))
 	repository := testMembershipRepository(membership)
-	service := NewService(repository, &verificationGateway{state: MemberState{Present: false}}, testGuildID)
+	service := testService(repository, &verificationGateway{state: MemberState{Present: false}})
 	if err := service.ReconcileMember(context.Background(), testGuildID, testUserID); err != nil {
 		t.Fatalf("ReconcileMember() error = %v", err)
 	}
@@ -32,7 +34,7 @@ func TestReconcileMemberInvalidatesMembershipFromPreviousJoin(t *testing.T) {
 	gateway := &verificationGateway{state: MemberState{
 		Present: true, JoinedAt: now, RoleIDs: map[string]struct{}{testRoleID: {}},
 	}}
-	service := NewService(repository, gateway, testGuildID)
+	service := testService(repository, gateway)
 	if err := service.ReconcileMember(context.Background(), testGuildID, testUserID); err != nil {
 		t.Fatalf("ReconcileMember() error = %v", err)
 	}
@@ -46,7 +48,7 @@ func TestReconcileMemberRestoresCurrentMembershipRole(t *testing.T) {
 	membership := testMembership(now)
 	repository := testMembershipRepository(membership)
 	gateway := &verificationGateway{state: MemberState{Present: true, JoinedAt: now.Add(-time.Hour), RoleIDs: map[string]struct{}{}}}
-	service := NewService(repository, gateway, testGuildID)
+	service := testService(repository, gateway)
 	if err := service.ReconcileMember(context.Background(), testGuildID, testUserID); err != nil {
 		t.Fatalf("ReconcileMember() error = %v", err)
 	}
@@ -64,4 +66,8 @@ func testMembershipRepository(membership Membership) *verificationRepository {
 		group:       Group{ID: testGroupID, RoleID: testRoleID},
 		memberships: map[string]Membership{testUserID + testGroupID: membership},
 	}
+}
+
+func testService(repository Repository, gateway Gateway) *Service {
+	return NewService(repository, gateway, &notificationPublisher{events: map[string]notification.Event{}}, testGuildID)
 }

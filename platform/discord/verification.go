@@ -18,15 +18,14 @@ const (
 	memberRemoveOperation  = "remove"
 )
 
-// VerificationGateway applies verification roles and DMs in one guild.
+// VerificationGateway applies verification roles and reads member state in one guild.
 type VerificationGateway struct {
-	client  *Client
-	catalog *localization.Catalog
+	client *Client
 }
 
 // NewVerificationGateway creates the guild-scoped verification adapter.
-func NewVerificationGateway(client *Client, catalog *localization.Catalog) *VerificationGateway {
-	return &VerificationGateway{client: client, catalog: catalog}
+func NewVerificationGateway(client *Client) *VerificationGateway {
+	return &VerificationGateway{client: client}
 }
 
 // MemberState returns the user's current guild membership and assigned roles.
@@ -95,24 +94,6 @@ func (gateway *VerificationGateway) RemoveRole(ctx context.Context, userID, role
 	if isDiscordErrorCode(err, discordgo.ErrCodeUnknownMember) || isDiscordErrorCode(err, discordgo.ErrCodeUnknownRole) {
 		return nil
 	}
-	return err
-}
-
-// SendVerifiedDM sends a Components V2 success message and unverify button.
-func (gateway *VerificationGateway) SendVerifiedDM(ctx context.Context, userID string, group verification.Group) error {
-	channel, err := gateway.client.session.UserChannelCreate(userID, discordgo.WithContext(ctx))
-	if err != nil {
-		return err
-	}
-	components := []discordgo.MessageComponent{
-		discordgo.TextDisplay{Content: gateway.catalog.Text(localization.VerificationSuccessKey, "group", group.ButtonLabel)},
-		discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.Button{
-			Label: gateway.catalog.Text(localization.VerificationUnverifyKey), Style: discordgo.DangerButton,
-			CustomID: verification.LeaveCustomIDPrefix + group.ID,
-		}}},
-	}
-	_, err = gateway.client.session.ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{Components: components,
-		Flags: discordgo.MessageFlagsIsComponentsV2, AllowedMentions: &discordgo.MessageAllowedMentions{Parse: []discordgo.AllowedMentionType{}}}, discordgo.WithContext(ctx))
 	return err
 }
 

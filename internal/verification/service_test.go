@@ -3,6 +3,8 @@ package verification
 import (
 	"context"
 	"testing"
+
+	"github.com/pixelados-net/discord-bot/internal/verification/notification"
 )
 
 type verificationRepository struct {
@@ -19,7 +21,7 @@ func (repository *verificationRepository) ListGroups(context.Context, bool) ([]G
 	return []Group{repository.group}, nil
 }
 func (repository *verificationRepository) UpsertMembership(_ context.Context, user string, group Group) (Membership, error) {
-	item := Membership{UserID: user, GroupID: group.ID, RoleID: group.RoleID}
+	item := Membership{ID: "membership", UserID: user, GroupID: group.ID, RoleID: group.RoleID}
 	repository.memberships[user+group.ID] = item
 	return item, nil
 }
@@ -45,8 +47,8 @@ func (repository *verificationRepository) ListMemberships(_ context.Context, use
 
 type verificationGateway struct {
 	Gateway
-	added, removed, dm bool
-	state              MemberState
+	added, removed bool
+	state          MemberState
 }
 
 func (gateway *verificationGateway) MemberState(context.Context, string) (MemberState, error) {
@@ -61,21 +63,32 @@ func (gateway *verificationGateway) RemoveRole(context.Context, string, string) 
 	gateway.removed = true
 	return nil
 }
-func (gateway *verificationGateway) SendVerifiedDM(context.Context, string, Group) error {
-	gateway.dm = true
-	return nil
+
+// notificationPublisher deduplicates recorded test events by idempotency key.
+type notificationPublisher struct {
+	events map[string]notification.Event
+}
+
+// Enqueue records one test notification event.
+func (publisher *notificationPublisher) Enqueue(_ context.Context, event notification.Event) {
+	publisher.events[event.IdempotencyKey] = event
 }
 
 func TestServiceSupportsIdempotentMultipleMembershipWorkflow(t *testing.T) {
 	group := Group{ID: "00000000-0000-0000-0000-000000000001", Key: "member", RoleID: "123", ButtonLabel: "Member", ButtonStyle: 1, Position: 1, Enabled: true}
 	repository := &verificationRepository{group: group, memberships: map[string]Membership{}}
 	gateway := &verificationGateway{}
-	service := NewService(repository, gateway, "456")
+	publisher := &notificationPublisher{events: map[string]notification.Event{}}
+	service := NewService(repository, gateway, publisher, "456")
 	if err := service.Verify(context.Background(), "456", "789", group.ID); err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
-	if !gateway.added || !gateway.dm || len(repository.memberships) != 1 {
-		t.Fatalf("verify state = %#v %#v", gateway, repository)
+	if !gateway.added || len(repository.memberships) != 1 || len(publisher.events) != 1 {
+		t.Fatalf("verify state = %#v %#v %#v", gateway, repository, publisher)
+	}
+	verified := publisher.events["verification:verified:membership"]
+	if verified.Kind != notification.KindVerified || verified.GroupKey != group.Key {
+		t.Fatalf("verified event = %#v", verified)
 	}
 	if err := service.Verify(context.Background(), "456", "789", group.ID); err != nil || len(repository.memberships) != 1 {
 		t.Fatalf("repeat Verify() error = %v", err)
@@ -83,13 +96,17 @@ func TestServiceSupportsIdempotentMultipleMembershipWorkflow(t *testing.T) {
 	if err := service.Unverify(context.Background(), "789", group.ID); err != nil {
 		t.Fatalf("Unverify() error = %v", err)
 	}
-	if !gateway.removed || !repository.deleted || len(repository.memberships) != 0 {
-		t.Fatalf("unverify state = %#v %#v", gateway, repository)
+	if !gateway.removed || !repository.deleted || len(repository.memberships) != 0 || len(publisher.events) != 2 {
+		t.Fatalf("unverify state = %#v %#v %#v", gateway, repository, publisher)
+	}
+	if publisher.events["verification:unverified:membership"].Kind != notification.KindUnverified {
+		t.Fatalf("events = %#v", publisher.events)
 	}
 }
 
 func TestServiceRejectsForeignGuild(t *testing.T) {
-	service := NewService(&verificationRepository{group: Group{}, memberships: map[string]Membership{}}, &verificationGateway{}, "456")
+	service := NewService(&verificationRepository{group: Group{}, memberships: map[string]Membership{}},
+		&verificationGateway{}, &notificationPublisher{events: map[string]notification.Event{}}, "456")
 	if err := service.Verify(context.Background(), "999", "789", "group"); err == nil {
 		t.Fatal("Verify() error = nil")
 	}

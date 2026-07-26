@@ -42,8 +42,8 @@ func provideMessageGateway(client *Client, config Config) *MessageGateway {
 	return NewMessageGateway(client, config.GuildID)
 }
 
-func provideVerificationGateway(client *Client, catalog *localization.Catalog) *VerificationGateway {
-	return NewVerificationGateway(client, catalog)
+func provideVerificationGateway(client *Client) *VerificationGateway {
+	return NewVerificationGateway(client)
 }
 
 func provideGuardGateway(client *Client) *GuardGateway { return NewGuardGateway(client) }

@@ -4,7 +4,7 @@ package openapi
 // Spec is the OpenAPI 3.0 document served by the HTTP API.
 const Spec = `{
   "openapi":"3.0.3",
-  "info":{"title":"discord-bot API","description":"Single-guild Discord operations and reusable Discord identity-link API.","version":"1.1.1"},
+  "info":{"title":"discord-bot API","description":"Single-guild Discord operations and reusable Discord identity-link API.","version":"1.1.2"},
   "paths":{
     "/status":{"get":{"tags":["Public"],"summary":"Read dependency status","responses":{"200":{"description":"Service status"}}}},
     "/guild/members":{"get":{"tags":["Public"],"summary":"Read approximate guild member and presence counts","responses":{"200":{"description":"Guild statistics"},"503":{"description":"Guild statistics unavailable"}}}},

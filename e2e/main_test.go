@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"go.uber.org/goleak"
@@ -20,6 +21,9 @@ func TestMain(main *testing.M) {
 		os.Exit(1)
 	}
 	testBinary = filepath.Join(temporary, "discord-bot")
+	if runtime.GOOS == "windows" {
+		testBinary += ".exe"
+	}
 	command := exec.Command("go", "build", "-o", testBinary, "../cmd")
 	if output, buildErr := command.CombinedOutput(); buildErr != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "build e2e binary: %v\n%s", buildErr, output)

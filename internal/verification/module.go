@@ -8,6 +8,7 @@ import (
 	"github.com/pixelados-net/discord-bot/internal/localization"
 	"github.com/pixelados-net/discord-bot/internal/messages"
 	"github.com/pixelados-net/discord-bot/internal/settings"
+	"github.com/pixelados-net/discord-bot/internal/verification/notification"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -22,7 +23,7 @@ const (
 // Module provides verification services, guard reconciliation, and startup repair.
 var Module = fx.Module("verification",
 	fx.Provide(
-		fx.Annotate(provideService, fx.ParamTags("", "", `name:"guild_id"`)),
+		fx.Annotate(provideService, fx.ParamTags("", "", "", `name:"guild_id"`)),
 		provideGuard,
 		fx.Annotate(provideGuardReconcileJob, fx.ResultTags(`group:"cronjobs"`)),
 		fx.Annotate(provideMembershipReconcileJob, fx.ResultTags(`group:"cronjobs"`)),
@@ -30,8 +31,8 @@ var Module = fx.Module("verification",
 	fx.Invoke(registerInitialReconciliation),
 )
 
-func provideService(repository Repository, gateway Gateway, guildID string) *Service {
-	return NewService(repository, gateway, guildID)
+func provideService(repository Repository, gateway Gateway, notifications notification.Publisher, guildID string) *Service {
+	return NewService(repository, gateway, notifications, guildID)
 }
 
 func provideGuard(repository Repository, messageService *messages.Service, settingService *settings.Service,

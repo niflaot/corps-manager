@@ -32,6 +32,4 @@ type Gateway interface {
 	AddRole(context.Context, string, string) error
 	// RemoveRole removes one role from one user.
 	RemoveRole(context.Context, string, string) error
-	// SendVerifiedDM sends the localized success and unverify button.
-	SendVerifiedDM(context.Context, string, Group) error
 }

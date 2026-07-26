@@ -7,19 +7,21 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/pixelados-net/discord-bot/internal/verification/notification"
 )
 
 // Service manages verification configuration and idempotent memberships.
 type Service struct {
-	repository Repository
-	gateway    Gateway
-	guildID    string
-	locks      memberLocks
+	repository    Repository
+	gateway       Gateway
+	notifications notification.Publisher
+	guildID       string
+	locks         memberLocks
 }
 
 // NewService creates a guild-scoped verification service.
-func NewService(repository Repository, gateway Gateway, guildID string) *Service {
-	return &Service{repository: repository, gateway: gateway, guildID: guildID}
+func NewService(repository Repository, gateway Gateway, notifications notification.Publisher, guildID string) *Service {
+	return &Service{repository: repository, gateway: gateway, notifications: notifications, guildID: guildID}
 }
 
 // CreateGroup validates Discord limits and creates one verification group.
@@ -102,11 +104,14 @@ func (service *Service) Verify(ctx context.Context, guildID, userID, groupID str
 	if err := service.gateway.AddRole(ctx, userID, group.RoleID); err != nil {
 		return err
 	}
-	if _, err := service.repository.UpsertMembership(ctx, userID, group); err != nil {
+	membership, err := service.repository.UpsertMembership(ctx, userID, group)
+	if err != nil {
 		_ = service.gateway.RemoveRole(ctx, userID, group.RoleID)
 		return err
 	}
-	_ = service.gateway.SendVerifiedDM(ctx, userID, group)
+	service.notifications.Enqueue(ctx, notification.NewEvent(
+		notification.KindVerified, membership.ID, userID, group.ID, group.Key,
+	))
 	return nil
 }
 
@@ -124,11 +129,17 @@ func (service *Service) Unverify(ctx context.Context, userID, groupID string) er
 	if err := service.gateway.RemoveRole(ctx, userID, group.RoleID); err != nil {
 		return err
 	}
-	_, err = service.repository.DeleteMembership(ctx, userID, groupID)
+	membership, err := service.repository.DeleteMembership(ctx, userID, groupID)
 	if err == ErrNotFound {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	service.notifications.Enqueue(ctx, notification.NewEvent(
+		notification.KindUnverified, membership.ID, userID, group.ID, group.Key,
+	))
+	return nil
 }
 
 func (service *Service) validateGroup(ctx context.Context, group Group) error {

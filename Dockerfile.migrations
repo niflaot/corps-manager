@@ -9,5 +9,7 @@ COPY internal/settings/postgres/changelog.xml ./internal/settings/postgres/chang
 COPY internal/settings/postgres/migrations ./internal/settings/postgres/migrations
 COPY internal/verification/postgres/changelog.xml ./internal/verification/postgres/changelog.xml
 COPY internal/verification/postgres/migrations ./internal/verification/postgres/migrations
+COPY internal/verification/notification/postgres/changelog.xml ./internal/verification/notification/postgres/changelog.xml
+COPY internal/verification/notification/postgres/migrations ./internal/verification/notification/postgres/migrations
 COPY internal/discordlinks/postgres/changelog.xml ./internal/discordlinks/postgres/changelog.xml
 COPY internal/discordlinks/postgres/migrations ./internal/discordlinks/postgres/migrations
