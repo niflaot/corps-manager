@@ -14,6 +14,9 @@ import (
 const (
 	inactivityListPageSize = 20
 	inactivityListPrefix   = "inactivity:list:page:"
+	openingTitle           = "Benny's Motor está abierto al público"
+	openingDescription     = "¡Visítanos en la propiedad **1995**!\nUsa `/prop 1995` para llegar."
+	openingColor           = 0x2ecc71
 )
 
 func inactivityListPage(customID string) (int, bool, bool) {
@@ -89,4 +92,50 @@ func (handler *inactivityInteractionHandler) respondList(ctx context.Context, se
 	if err != nil {
 		handler.log.Error("respond with inactivity registry list", zap.Error(err))
 	}
+}
+
+func (handler *inactivityInteractionHandler) announceOpening(session *discordgo.Session,
+	event *discordgo.InteractionCreate) {
+	ctx, cancel := context.WithTimeout(context.Background(), interactionTimeout)
+	defer cancel()
+	if handler.config.AnnouncementChannelID == "" {
+		handler.respondWithContext(ctx, session, event.Interaction, "❌ El canal de anuncios no está configurado.")
+		return
+	}
+	actor := interactionActor(event)
+	_, err := session.ChannelMessageSendComplex(handler.config.AnnouncementChannelID,
+		openingAnnouncement(actor), discordgo.WithContext(ctx))
+	if err != nil {
+		handler.log.Error("publish business opening announcement",
+			zap.String("channel_id", handler.config.AnnouncementChannelID), zap.String("actor", actor), zap.Error(err))
+		handler.respondWithContext(ctx, session, event.Interaction, "❌ No fue posible publicar la apertura.")
+		return
+	}
+	handler.respondWithContext(ctx, session, event.Interaction, "✅ La apertura fue anunciada correctamente.")
+}
+
+func openingAnnouncement(actor string) *discordgo.MessageSend {
+	return &discordgo.MessageSend{Content: "@everyone", Embeds: []*discordgo.MessageEmbed{{
+		Title: openingTitle, Description: openingDescription, Color: openingColor,
+		Footer: &discordgo.MessageEmbedFooter{Text: "Anunciado por: " + actor},
+	}}, AllowedMentions: &discordgo.MessageAllowedMentions{
+		Parse: []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeEveryone},
+	}}
+}
+
+func interactionActor(event *discordgo.InteractionCreate) string {
+	if event.Member != nil && strings.TrimSpace(event.Member.Nick) != "" {
+		return strings.TrimSpace(event.Member.Nick)
+	}
+	user := event.User
+	if event.Member != nil && event.Member.User != nil {
+		user = event.Member.User
+	}
+	if user != nil && strings.TrimSpace(user.GlobalName) != "" {
+		return strings.TrimSpace(user.GlobalName)
+	}
+	if user != nil && strings.TrimSpace(user.Username) != "" {
+		return strings.TrimSpace(user.Username)
+	}
+	return "Usuario desconocido"
 }

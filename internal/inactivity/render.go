@@ -15,6 +15,8 @@ const (
 	ButtonAddCustomID = "inactivity:add"
 	// ButtonRemoveCustomID identifies the button that opens the removal modal.
 	ButtonRemoveCustomID = "inactivity:remove"
+	// ButtonOpeningCustomID identifies the public business-opening action.
+	ButtonOpeningCustomID = "inactivity:announce-opening"
 )
 
 type component struct {
@@ -31,7 +33,7 @@ type component struct {
 
 // Render creates the interactive inactivity registry message definition.
 func Render(entries []Entry, config Config, guildID string) (messages.Definition, error) {
-	container := component{Type: 17, Accent: registryAccent, Components: []component{
+	components := []component{
 		{Type: 10, Content: "# 💤 Expulsados por inactividad"},
 		{Type: 10, Content: fmt.Sprintf("**Total registrado:** %d\nLa lista se consulta de forma privada.", len(entries))},
 		{Type: 14, Divider: true, Spacing: 1},
@@ -40,7 +42,17 @@ func Render(entries []Entry, config Config, guildID string) (messages.Definition
 			{Type: 2, Style: 3, Label: "Añadir empleado", CustomID: ButtonAddCustomID},
 			{Type: 2, Style: 4, Label: "Retirar empleado", CustomID: ButtonRemoveCustomID},
 		}},
-	}}
+	}
+	if config.AnnouncementChannelID != "" {
+		components = append(components,
+			component{Type: 14, Divider: true, Spacing: 1},
+			component{Type: 10, Content: "## Operación del negocio"},
+			component{Type: 1, Components: []component{
+				{Type: 2, Style: 3, Label: "Accionar apertura", CustomID: ButtonOpeningCustomID},
+			}},
+		)
+	}
+	container := component{Type: 17, Accent: registryAccent, Components: components}
 	encoded, err := json.Marshal(container)
 	if err != nil {
 		return messages.Definition{}, fmt.Errorf("encode inactivity dashboard: %w", err)

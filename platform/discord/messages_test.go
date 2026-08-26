@@ -98,6 +98,22 @@ func TestInactivityInteractionHelpers(t *testing.T) {
 	}
 }
 
+func TestOpeningAnnouncementMentionsEveryoneAndAttributesActor(t *testing.T) {
+	payload := openingAnnouncement("Thomas J.")
+	if payload.Content != "@everyone" || len(payload.Embeds) != 1 || payload.Embeds[0].Title != openingTitle ||
+		payload.Embeds[0].Footer == nil || payload.Embeds[0].Footer.Text != "Anunciado por: Thomas J." ||
+		payload.AllowedMentions == nil || len(payload.AllowedMentions.Parse) != 1 ||
+		payload.AllowedMentions.Parse[0] != discordgo.AllowedMentionTypeEveryone {
+		t.Fatalf("openingAnnouncement() = %#v", payload)
+	}
+	event := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{Member: &discordgo.Member{
+		Nick: "Thomas J.", User: &discordgo.User{Username: "fallback"},
+	}}}
+	if actor := interactionActor(event); actor != "Thomas J." {
+		t.Fatalf("interactionActor() = %q", actor)
+	}
+}
+
 func v2Payload() messages.Payload {
 	return messages.Payload{Components: []messages.Component{messages.Component(`{"type":10,"content":"Rules"}`)}, AllowedMentions: messages.AllowedMentions{Parse: []string{}}}
 }

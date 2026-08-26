@@ -48,7 +48,8 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 		return
 	}
 	if customID != inactivity.ButtonAddCustomID && customID != inactivity.ButtonRemoveCustomID &&
-		customID != inactivityAddModalID && customID != inactivityRemoveModalID {
+		customID != inactivity.ButtonOpeningCustomID && customID != inactivityAddModalID &&
+		customID != inactivityRemoveModalID {
 		return
 	}
 	if !canManageRegistry(event) {
@@ -60,6 +61,8 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 		handler.openModal(session, event.Interaction, inactivityAddModalID, "Añadir empleado expulsado")
 	case inactivity.ButtonRemoveCustomID:
 		handler.openModal(session, event.Interaction, inactivityRemoveModalID, "Retirar empleado del registro")
+	case inactivity.ButtonOpeningCustomID:
+		handler.announceOpening(session, event)
 	case inactivityAddModalID, inactivityRemoveModalID:
 		handler.submit(session, event, customID)
 	}
