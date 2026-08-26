@@ -33,6 +33,6 @@ func LoadConfig() (Config, error) {
 	if !snowflakePattern.MatchString(config.GuildID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_GUILD_ID must be a Discord snowflake")
 	}
-	config.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages
+	config.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
 	return config, nil
 }

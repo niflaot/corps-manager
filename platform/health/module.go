@@ -8,13 +8,11 @@ import (
 	"github.com/pixelados-net/discord-bot/internal/cronjob"
 	"github.com/pixelados-net/discord-bot/platform/discord"
 	"github.com/pixelados-net/discord-bot/platform/postgres"
-	redisplatform "github.com/pixelados-net/discord-bot/platform/redis"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
 const (
-	redisDependencyName         = "redis"
 	postgresDependencyName      = "postgres"
 	discordDependencyName       = "discord"
 	dependencyHealthJobName     = "dependency-health"
@@ -27,10 +25,8 @@ var Module = fx.Module("health", fx.Provide(
 	fx.Annotate(provideHealthJob, fx.ResultTags(`group:"cronjobs"`)),
 ))
 
-func provideService(redisClient *redisplatform.Client, postgresPool *postgres.Pool,
-	discordClient *discord.Client) *Service {
+func provideService(postgresPool *postgres.Pool, discordClient *discord.Client) *Service {
 	return New(map[string]Check{
-		redisDependencyName:    redisClient.Ping,
 		postgresDependencyName: postgresPool.Ping,
 		discordDependencyName: func(context.Context) error {
 			if !discordClient.Connected() {

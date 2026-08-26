@@ -47,3 +47,25 @@ func TestSchedulerRejectsInvalidJob(t *testing.T) {
 		t.Fatal("Register() error = nil")
 	}
 }
+
+func TestSchedulerRunsJobOnStart(t *testing.T) {
+	scheduler := New(clock.NewFake(time.Now()), zap.NewNop())
+	runs := make(chan struct{}, 1)
+	if err := scheduler.Register(Job{Name: "startup", Interval: time.Hour, RunOnStart: true,
+		Handler: func(context.Context) error { runs <- struct{}{}; return nil }}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- scheduler.Run(ctx) }()
+	select {
+	case <-runs:
+		cancel()
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		cancel()
+		t.Fatal("startup job did not run")
+	}
+}

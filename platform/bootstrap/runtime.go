@@ -6,9 +6,7 @@ import (
 
 	"github.com/pixelados-net/discord-bot/internal/cronjob"
 	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/internal/verification/notification"
 	"github.com/pixelados-net/discord-bot/platform/discord"
-	"github.com/pixelados-net/discord-bot/platform/events"
 	"github.com/pixelados-net/discord-bot/platform/httpapi"
 	"go.uber.org/fx"
 	"golang.org/x/sync/errgroup"
@@ -20,7 +18,6 @@ type Runtime struct {
 	discord    *discord.Client
 	scheduler  *cronjob.Scheduler
 	reconciler *messages.Reconciler
-	dispatcher *notification.Dispatcher
 	cancel     context.CancelFunc
 	done       chan struct{}
 	err        error
@@ -28,10 +25,9 @@ type Runtime struct {
 }
 
 func newRuntime(lifecycle fx.Lifecycle, server *httpapi.Server, discordClient *discord.Client,
-	scheduler *cronjob.Scheduler, reconciler *messages.Reconciler, dispatcher *notification.Dispatcher,
-	_ *events.Bus, _ discord.Handlers) *Runtime {
+	scheduler *cronjob.Scheduler, reconciler *messages.Reconciler) *Runtime {
 	runtime := &Runtime{server: server, discord: discordClient, scheduler: scheduler,
-		reconciler: reconciler, dispatcher: dispatcher, done: make(chan struct{})}
+		reconciler: reconciler, done: make(chan struct{})}
 	lifecycle.Append(fx.Hook{OnStart: runtime.start, OnStop: runtime.stop})
 	return runtime
 }
@@ -44,7 +40,6 @@ func (runtime *Runtime) start(context.Context) error {
 	group.Go(func() error { return runtime.discord.Run(groupContext) })
 	group.Go(func() error { return runtime.scheduler.Run(groupContext) })
 	group.Go(func() error { return runtime.reconciler.Run(groupContext) })
-	group.Go(func() error { return runtime.dispatcher.Run(groupContext) })
 	go func() {
 		err := group.Wait()
 		runtime.mutex.Lock()

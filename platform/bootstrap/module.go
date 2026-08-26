@@ -2,28 +2,18 @@ package bootstrap
 
 import (
 	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/internal/discordlinks"
-	discordlinkspostgres "github.com/pixelados-net/discord-bot/internal/discordlinks/postgres"
-	"github.com/pixelados-net/discord-bot/internal/localization"
 	"github.com/pixelados-net/discord-bot/internal/messages"
 	messagespostgres "github.com/pixelados-net/discord-bot/internal/messages/postgres"
-	"github.com/pixelados-net/discord-bot/internal/settings"
-	settingspostgres "github.com/pixelados-net/discord-bot/internal/settings/postgres"
-	"github.com/pixelados-net/discord-bot/internal/verification"
-	verificationnotification "github.com/pixelados-net/discord-bot/internal/verification/notification"
-	verificationnotificationpostgres "github.com/pixelados-net/discord-bot/internal/verification/notification/postgres"
-	verificationpostgres "github.com/pixelados-net/discord-bot/internal/verification/postgres"
+	"github.com/pixelados-net/discord-bot/internal/performance"
+	performancepostgres "github.com/pixelados-net/discord-bot/internal/performance/postgres"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
 	"github.com/pixelados-net/discord-bot/platform/clock"
 	"github.com/pixelados-net/discord-bot/platform/discord"
-	discordnotification "github.com/pixelados-net/discord-bot/platform/discord/notification"
-	"github.com/pixelados-net/discord-bot/platform/discordoauth"
-	"github.com/pixelados-net/discord-bot/platform/events"
 	"github.com/pixelados-net/discord-bot/platform/health"
 	"github.com/pixelados-net/discord-bot/platform/httpapi"
 	"github.com/pixelados-net/discord-bot/platform/logger"
 	"github.com/pixelados-net/discord-bot/platform/postgres"
-	redisplatform "github.com/pixelados-net/discord-bot/platform/redis"
+	"github.com/pixelados-net/discord-bot/platform/sarp"
 	"go.uber.org/fx"
 )
 
@@ -33,22 +23,12 @@ var Module = fx.Module("bootstrap",
 	clock.Module,
 	logger.Module,
 	postgres.Module,
-	redisplatform.Module,
-	events.Module,
-	localization.Module,
 	messagespostgres.Module,
-	settingspostgres.Module,
-	verificationpostgres.Module,
-	verificationnotificationpostgres.Module,
-	discordlinkspostgres.Module,
+	performancepostgres.Module,
 	discord.Module,
-	discordnotification.Module,
-	discordoauth.Module,
+	sarp.Module,
 	messages.Module,
-	settings.Module,
-	verificationnotification.Module,
-	verification.Module,
-	discordlinks.Module,
+	performance.Module,
 	health.Module,
 	cronjob.Module,
 	httpapi.Module,

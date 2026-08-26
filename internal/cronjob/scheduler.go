@@ -22,6 +22,8 @@ type Job struct {
 	Interval time.Duration
 	// Handler contains the job behavior.
 	Handler Handler
+	// RunOnStart executes the handler once before waiting for the first tick.
+	RunOnStart bool
 }
 
 // Scheduler runs registered jobs until its context is canceled.
@@ -67,6 +69,9 @@ func (scheduler *Scheduler) Run(ctx context.Context) error {
 }
 
 func (scheduler *Scheduler) run(ctx context.Context, job Job) {
+	if job.RunOnStart {
+		scheduler.execute(ctx, job)
+	}
 	ticker := scheduler.clock.NewTicker(job.Interval)
 	defer ticker.Stop()
 	for {
@@ -74,9 +79,13 @@ func (scheduler *Scheduler) run(ctx context.Context, job Job) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C():
-			if err := job.Handler(ctx); err != nil {
-				scheduler.log.Error("cron job failed", zap.String("job", job.Name), zap.Error(err))
-			}
+			scheduler.execute(ctx, job)
 		}
+	}
+}
+
+func (scheduler *Scheduler) execute(ctx context.Context, job Job) {
+	if err := job.Handler(ctx); err != nil {
+		scheduler.log.Error("cron job failed", zap.String("job", job.Name), zap.Error(err))
 	}
 }

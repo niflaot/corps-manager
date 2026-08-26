@@ -73,40 +73,10 @@ func (client *Client) GuildID() string {
 	return client.guildID
 }
 
-// ValidateGuildAdministrator verifies exclusive guild membership and administrator permission.
-func (client *Client) ValidateGuildAdministrator(ctx context.Context) error {
-	userID, err := client.BotUserID(ctx)
-	if err != nil {
+// ValidateAuthentication verifies the bot token before workers start.
+func (client *Client) ValidateAuthentication(ctx context.Context) error {
+	if _, err := client.BotUserID(ctx); err != nil {
 		return fmt.Errorf("authenticate Discord bot: %w", err)
-	}
-	guilds, err := client.session.UserGuilds(200, "", "", false, discordgo.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("list Discord guilds: %w", err)
-	}
-	if len(guilds) != 1 || guilds[0].ID != client.guildID {
-		return fmt.Errorf("discord bot must belong exclusively to configured guild %s", client.guildID)
-	}
-	member, err := client.session.GuildMember(client.guildID, userID, discordgo.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("read configured guild membership: %w", err)
-	}
-	roles, err := client.session.GuildRoles(client.guildID, discordgo.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("read configured guild roles: %w", err)
-	}
-	memberRoles := make(map[string]struct{}, len(member.Roles)+1)
-	memberRoles[client.guildID] = struct{}{}
-	for _, roleID := range member.Roles {
-		memberRoles[roleID] = struct{}{}
-	}
-	var permissions int64
-	for _, role := range roles {
-		if _, ok := memberRoles[role.ID]; ok {
-			permissions |= role.Permissions
-		}
-	}
-	if permissions&discordgo.PermissionAdministrator == 0 {
-		return fmt.Errorf("discord bot requires administrator permission in guild %s", client.guildID)
 	}
 	return nil
 }

@@ -56,7 +56,7 @@ func TestLoadConfigAndNew(t *testing.T) {
 	if client.SDK() == nil || client.Connected() {
 		t.Fatalf("unexpected client state: %#v", client)
 	}
-	if config.Intents&discordgo.IntentsGuildMembers == 0 {
-		t.Fatal("GUILD_MEMBERS intent is disabled")
+	if config.Intents&discordgo.IntentsGuildMembers != 0 {
+		t.Fatal("GUILD_MEMBERS intent is unexpectedly enabled")
 	}
 }

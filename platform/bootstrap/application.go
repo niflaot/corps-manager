@@ -8,7 +8,6 @@ import (
 	"time"
 
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/events"
 	"go.uber.org/fx"
 )
 
@@ -18,18 +17,16 @@ const shutdownTimeout = 15 * time.Second
 type Application struct {
 	app       *fx.App
 	runtime   *Runtime
-	events    *events.Bus
 	closeOnce sync.Once
 }
 
 // New builds and starts the Fx application graph.
 func New(ctx context.Context, version string) (*Application, error) {
 	var runtime *Runtime
-	var eventBus *events.Bus
 	fxApp := fx.New(
 		Module,
 		fx.Supply(appconfig.Version(version)),
-		fx.Populate(&runtime, &eventBus),
+		fx.Populate(&runtime),
 		fx.NopLogger,
 	)
 	if err := fxApp.Start(ctx); err != nil {
@@ -38,11 +35,8 @@ func New(ctx context.Context, version string) (*Application, error) {
 		_ = fxApp.Stop(stopContext)
 		return nil, fmt.Errorf("start application: %w", err)
 	}
-	return &Application{app: fxApp, runtime: runtime, events: eventBus}, nil
+	return &Application{app: fxApp, runtime: runtime}, nil
 }
-
-// Events returns the process-local application event bus.
-func (application *Application) Events() *events.Bus { return application.events }
 
 // Run waits for cancellation or an asynchronous runtime failure.
 func (application *Application) Run(ctx context.Context) error {

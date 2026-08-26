@@ -7,12 +7,9 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/internal/settings"
-	"github.com/pixelados-net/discord-bot/internal/verification"
+	"github.com/pixelados-net/discord-bot/internal/performance"
 	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/discord"
 	"github.com/pixelados-net/discord-bot/platform/health"
-	"github.com/pixelados-net/discord-bot/platform/httpapi/linkapi"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -26,7 +23,7 @@ type Config struct {
 }
 
 // Module provides HTTP configuration, routes, Fiber application, and server.
-var Module = fx.Module("httpapi", linkapi.Module, fx.Provide(
+var Module = fx.Module("httpapi", fx.Provide(
 	LoadConfig, provideDependencies, provideApplication, provideServer,
 ))
 
@@ -46,12 +43,8 @@ func LoadConfig() (Config, error) {
 	return config, nil
 }
 
-func provideDependencies(messageService *messages.Service, settingService *settings.Service,
-	verificationService *verification.Service, guard *verification.Guard, guildGateway *discord.GuildGateway,
-	discordLinkRoutes *linkapi.Routes) Dependencies {
-	return Dependencies{Messages: messageService, Settings: settingService,
-		Verification: verificationService, VerificationGuard: guard, Guild: guildGateway,
-		DiscordLinks: discordLinkRoutes}
+func provideDependencies(messageService *messages.Service, performanceService *performance.Service) Dependencies {
+	return Dependencies{Messages: messageService, Performance: performanceService}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,
