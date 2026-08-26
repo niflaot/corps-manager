@@ -18,6 +18,7 @@ const (
 	inactivityListPrefix   = "inactivity:list:page:"
 	openingTitle           = "Benny's Motor está abierto al público"
 	openingDescription     = "¡Visítanos en la propiedad **1995**!\nUsa `/prop 1995` para llegar."
+	openingThumbnailURL    = "https://storageapi.flockstore.co/fl-assets/icon.png"
 	openingColor           = 0x2ecc71
 )
 
@@ -141,7 +142,8 @@ func (gateway *OpeningGateway) SendOpening(ctx context.Context, channelID string
 func openingAnnouncement(actor string) *discordgo.MessageSend {
 	return &discordgo.MessageSend{Content: "@everyone", Embeds: []*discordgo.MessageEmbed{{
 		Title: openingTitle, Description: openingDescription, Color: openingColor,
-		Footer: &discordgo.MessageEmbedFooter{Text: "Anunciado por: " + actor},
+		Thumbnail: &discordgo.MessageEmbedThumbnail{URL: openingThumbnailURL},
+		Footer:    &discordgo.MessageEmbedFooter{Text: "Anunciado por: " + actor},
 	}}, AllowedMentions: &discordgo.MessageAllowedMentions{
 		Parse: []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeEveryone},
 	}}

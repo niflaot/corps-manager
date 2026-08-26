@@ -101,6 +101,7 @@ func TestInactivityInteractionHelpers(t *testing.T) {
 func TestOpeningAnnouncementMentionsEveryoneAndAttributesActor(t *testing.T) {
 	payload := openingAnnouncement("Thomas J.")
 	if payload.Content != "@everyone" || len(payload.Embeds) != 1 || payload.Embeds[0].Title != openingTitle ||
+		payload.Embeds[0].Thumbnail == nil || payload.Embeds[0].Thumbnail.URL != openingThumbnailURL ||
 		payload.Embeds[0].Footer == nil || payload.Embeds[0].Footer.Text != "Anunciado por: Thomas J." ||
 		payload.AllowedMentions == nil || len(payload.AllowedMentions.Parse) != 1 ||
 		payload.AllowedMentions.Parse[0] != discordgo.AllowedMentionTypeEveryone {
