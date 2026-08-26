@@ -10,6 +10,8 @@ import (
 const (
 	registryAccent     = 0xe67e22
 	announcementAccent = 0x2ecc71
+	registryMessageKey = "inactivity-dismissals"
+	openingMessageKey  = "business-opening-control"
 	// ButtonListCustomID identifies the button that privately lists entries.
 	ButtonListCustomID = "inactivity:list"
 	// ButtonAddCustomID identifies the button that opens the add modal.
@@ -49,7 +51,7 @@ func Render(entries []Entry, config Config, guildID string) (messages.Definition
 	if err != nil {
 		return messages.Definition{}, fmt.Errorf("encode inactivity dashboard: %w", err)
 	}
-	return messages.Definition{Key: config.MessageKey, GuildID: guildID, ChannelID: config.ChannelID,
+	return messages.Definition{Key: registryMessageKey, GuildID: guildID, ChannelID: config.ChannelID,
 		Payload: messages.Payload{Components: []messages.Component{encoded},
 			AllowedMentions: messages.AllowedMentions{Parse: []string{}}}}, nil
 }
@@ -69,7 +71,7 @@ func RenderOpeningControl(config Config, guildID string) (messages.Definition, e
 	if err != nil {
 		return messages.Definition{}, fmt.Errorf("encode opening control: %w", err)
 	}
-	return messages.Definition{Key: config.AnnouncementMessageKey, GuildID: guildID, ChannelID: config.ChannelID,
+	return messages.Definition{Key: openingMessageKey, GuildID: guildID, ChannelID: config.ChannelID,
 		Payload: messages.Payload{Components: []messages.Component{encoded},
 			AllowedMentions: messages.AllowedMentions{Parse: []string{}}}}, nil
 }

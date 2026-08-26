@@ -80,7 +80,7 @@ func TestAggregateDoesNotSubtractResetCounter(t *testing.T) {
 }
 
 func TestRenderProducesValidManagedMessage(t *testing.T) {
-	config := Config{BusinessID: 1995, ChannelID: "456", MessageKey: "business-performance", Timezone: time.UTC}
+	config := Config{BusinessID: 1995, ChannelID: "456", Timezone: time.UTC}
 	state := State{BusinessID: 1995, Name: "Warehouse", Bank: 1000, HistoricalGenerated: 300,
 		PeriodGenerated: 50, PeriodStartedAt: time.Now().AddDate(0, 0, -1), LastCollectedAt: time.Now(),
 		Employees: map[string]EmployeeState{"1": {EmployeeSnapshot: EmployeeSnapshot{CharacterID: 1, Name: "Alice"},
@@ -91,5 +91,8 @@ func TestRenderProducesValidManagedMessage(t *testing.T) {
 	}
 	if err := definition.Validate(); err != nil {
 		t.Fatalf("rendered definition is invalid: %v", err)
+	}
+	if definition.Key != performanceMessageKey || definition.ChannelID != "456" {
+		t.Fatalf("performance definition = %#v", definition)
 	}
 }

@@ -181,7 +181,7 @@ func (service *Service) publish(ctx context.Context, state State) error {
 	if err != nil {
 		return err
 	}
-	record, err := service.messages.Get(ctx, service.config.MessageKey)
+	record, err := service.messages.Get(ctx, performanceMessageKey)
 	if errors.Is(err, messages.ErrNotFound) {
 		_, err = service.messages.Create(ctx, definition, fmt.Sprintf("performance-create-%d", state.BusinessID))
 		return err

@@ -29,7 +29,7 @@ func LoadConfig() (Config, error) {
 	if config.Cooldown <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_COOLDOWN must be positive")
 	}
-	if config.ChannelID != "" && !channelPattern.MatchString(config.ChannelID) {
+	if !channelPattern.MatchString(config.ChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
 	}
 	return config, nil

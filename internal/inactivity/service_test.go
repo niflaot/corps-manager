@@ -7,14 +7,12 @@ import (
 	"testing"
 )
 
-func TestLoadConfigDefaultsToPerformanceChannel(t *testing.T) {
+func TestLoadConfigUsesPerformanceChannel(t *testing.T) {
 	t.Setenv("DISCORD_BOT_INACTIVITY_ENABLED", "true")
-	t.Setenv("DISCORD_BOT_INACTIVITY_CHANNEL_ID", "")
 	t.Setenv("DISCORD_BOT_PERFORMANCE_CHANNEL_ID", "456")
 	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID", "789")
 	config, err := LoadConfig()
-	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" ||
-		config.AnnouncementMessageKey != "business-opening-control" {
+	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" {
 		t.Fatalf("LoadConfig() = %#v, %v", config, err)
 	}
 }
@@ -33,12 +31,15 @@ func TestNormalizeName(t *testing.T) {
 
 func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 	definition, err := Render([]Entry{{Name: "Thomas_Jhonson"}, {Name: "Andy_Quintero"}},
-		Config{ChannelID: "456", MessageKey: "inactivity-dismissals", AnnouncementChannelID: "789"}, "123")
+		Config{ChannelID: "456", AnnouncementChannelID: "789"}, "123")
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 	if err := definition.Validate(); err != nil {
 		t.Fatalf("rendered definition is invalid: %v", err)
+	}
+	if definition.Key != registryMessageKey || definition.ChannelID != "456" {
+		t.Fatalf("employee definition = %#v", definition)
 	}
 	encoded, err := json.Marshal(definition.Payload)
 	if err != nil {
@@ -59,12 +60,12 @@ func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 }
 
 func TestRenderOpeningControlProducesSeparateManagedMessage(t *testing.T) {
-	config := Config{ChannelID: "456", AnnouncementMessageKey: "business-opening-control"}
+	config := Config{ChannelID: "456"}
 	definition, err := RenderOpeningControl(config, "123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if definition.Key != "business-opening-control" || definition.ChannelID != "456" {
+	if definition.Key != openingMessageKey || definition.ChannelID != "456" {
 		t.Fatalf("opening definition = %#v", definition)
 	}
 	encoded, err := json.Marshal(definition.Payload)
@@ -77,7 +78,7 @@ func TestRenderOpeningControlProducesSeparateManagedMessage(t *testing.T) {
 }
 
 func TestDashboardFingerprintIncludesAssignment(t *testing.T) {
-	definition, err := Render(nil, Config{ChannelID: "456", MessageKey: "inactivity-dismissals"}, "123")
+	definition, err := Render(nil, Config{ChannelID: "456"}, "123")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,8 @@ import (
 )
 
 var discordSnowflakePattern = regexp.MustCompile(`^[0-9]{1,20}$`)
-var messageKeyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+
+const performanceMessageKey = "business-performance"
 
 // Config controls business earnings collection and its Discord dashboard.
 type Config struct {
@@ -25,8 +26,6 @@ type Config struct {
 	BusinessID int64 `env:"DISCORD_BOT_PERFORMANCE_BUSINESS_ID"`
 	// ChannelID selects the Discord dashboard channel.
 	ChannelID string `env:"DISCORD_BOT_PERFORMANCE_CHANNEL_ID"`
-	// MessageKey is the stable managed-message key.
-	MessageKey string `env:"DISCORD_BOT_PERFORMANCE_MESSAGE_KEY" envDefault:"business-performance"`
 	// Interval controls data refresh frequency.
 	Interval time.Duration `env:"DISCORD_BOT_PERFORMANCE_INTERVAL" envDefault:"6h"`
 	// CutoffWeekday is the weekly period boundary.
@@ -57,7 +56,6 @@ func LoadConfig() (Config, error) {
 	config.Endpoint = strings.TrimSpace(config.Endpoint)
 	config.EndpointToken = strings.TrimSpace(config.EndpointToken)
 	config.ChannelID = strings.TrimSpace(config.ChannelID)
-	config.MessageKey = strings.TrimSpace(config.MessageKey)
 	config.CutoffWeekday, err = parseWeekday(raw.CutoffWeekday)
 	if err != nil {
 		return Config{}, err
@@ -81,9 +79,6 @@ func LoadConfig() (Config, error) {
 	}
 	if config.Interval <= 0 || config.HTTPTimeout <= 0 || config.MaxResponseBytes <= 0 || config.HistoryLimit <= 0 {
 		return Config{}, fmt.Errorf("performance durations and limits must be positive")
-	}
-	if !messageKeyPattern.MatchString(config.MessageKey) {
-		return Config{}, fmt.Errorf("DISCORD_BOT_PERFORMANCE_MESSAGE_KEY is invalid")
 	}
 	return config, nil
 }

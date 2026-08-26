@@ -100,3 +100,15 @@ func TestServiceRejectsInvalidActorAndDisabledChannel(t *testing.T) {
 		t.Fatalf("invalid actor error = %v", err)
 	}
 }
+
+func TestLoadConfigRequiresPublicAnnouncementChannel(t *testing.T) {
+	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID", "")
+	if _, err := LoadConfig(); err == nil {
+		t.Fatal("expected missing announcement channel error")
+	}
+	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID", "123456789")
+	config, err := LoadConfig()
+	if err != nil || config.ChannelID != "123456789" || config.Cooldown != 30*time.Minute {
+		t.Fatalf("LoadConfig() = %#v, %v", config, err)
+	}
+}

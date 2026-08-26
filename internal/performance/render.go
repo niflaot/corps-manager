@@ -57,7 +57,7 @@ func Render(state State, config Config, guildID string) (messages.Definition, er
 	if err != nil {
 		return messages.Definition{}, fmt.Errorf("encode performance dashboard: %w", err)
 	}
-	return messages.Definition{Key: config.MessageKey, GuildID: guildID, ChannelID: config.ChannelID,
+	return messages.Definition{Key: performanceMessageKey, GuildID: guildID, ChannelID: config.ChannelID,
 		Payload: messages.Payload{Components: []messages.Component{encoded},
 			AllowedMentions: messages.AllowedMentions{Parse: []string{}}}}, nil
 }
