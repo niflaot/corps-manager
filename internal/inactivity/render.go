@@ -3,13 +3,14 @@ package inactivity
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 const (
 	registryAccent = 0xe67e22
+	// ButtonListCustomID identifies the button that privately lists entries.
+	ButtonListCustomID = "inactivity:list"
 	// ButtonAddCustomID identifies the button that opens the add modal.
 	ButtonAddCustomID = "inactivity:add"
 	// ButtonRemoveCustomID identifies the button that opens the removal modal.
@@ -30,21 +31,12 @@ type component struct {
 
 // Render creates the interactive inactivity registry message definition.
 func Render(entries []Entry, config Config, guildID string) (messages.Definition, error) {
-	content := "Sin empleados registrados."
-	if len(entries) > 0 {
-		lines := make([]string, 0, len(entries)+2)
-		lines = append(lines, "```text", "Empleado")
-		for _, entry := range entries {
-			lines = append(lines, entry.Name)
-		}
-		lines = append(lines, "```")
-		content = strings.Join(lines, "\n")
-	}
 	container := component{Type: 17, Accent: registryAccent, Components: []component{
 		{Type: 10, Content: "# 💤 Expulsados por inactividad"},
-		{Type: 10, Content: fmt.Sprintf("**Total:** %d\n%s", len(entries), content)},
+		{Type: 10, Content: fmt.Sprintf("**Total registrado:** %d\nLa lista se consulta de forma privada.", len(entries))},
 		{Type: 14, Divider: true, Spacing: 1},
 		{Type: 1, Components: []component{
+			{Type: 2, Style: 1, Label: "Ver inactivos", CustomID: ButtonListCustomID},
 			{Type: 2, Style: 3, Label: "Añadir empleado", CustomID: ButtonAddCustomID},
 			{Type: 2, Style: 4, Label: "Retirar empleado", CustomID: ButtonRemoveCustomID},
 		}},

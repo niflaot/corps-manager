@@ -6,16 +6,15 @@ import (
 	"math/bits"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 const (
 	dashboardAccent       = 0x2ecc71
-	employeeColumnWidth   = 20
-	moneyColumnWidth      = 11
-	serviceColumnWidth    = 10
+	employeeColumnWidth   = 14
+	moneyColumnWidth      = 10
+	serviceColumnWidth    = 6
 	employeesContentLimit = 3000
 )
 
@@ -164,16 +163,17 @@ func higherRank(left, right employeeRankGroup) bool {
 }
 func employeeTableHeader() string {
 	return fmt.Sprintf("%-*s %*s %*s %*s %*s\n%s %s %s %s %s\n", employeeColumnWidth, "Empleado",
-		moneyColumnWidth, "$ semana", moneyColumnWidth, "$ total", serviceColumnWidth, "H semana",
-		serviceColumnWidth, "H total", strings.Repeat("-", employeeColumnWidth),
+		moneyColumnWidth, "Semana", moneyColumnWidth, "Total", serviceColumnWidth, "H sem",
+		serviceColumnWidth, "H tot", strings.Repeat("-", employeeColumnWidth),
 		strings.Repeat("-", moneyColumnWidth), strings.Repeat("-", moneyColumnWidth),
 		strings.Repeat("-", serviceColumnWidth), strings.Repeat("-", serviceColumnWidth))
 }
 func employeeTableRow(employee EmployeeState) string {
-	name := tableCell(employee.Name, employeeColumnWidth)
+	name := tableCell(employeeDisplayName(employee.Name), employeeColumnWidth)
 	return fmt.Sprintf("%-*s %*s %*s %*s %*s\n", employeeColumnWidth, name, moneyColumnWidth,
 		money(employee.PeriodGenerated), moneyColumnWidth, money(employee.HistoricalGenerated), serviceColumnWidth,
-		serviceDuration(employee.PeriodServiceMinutes), serviceColumnWidth, serviceDuration(employee.HistoricalServiceMinutes))
+		serviceTableDuration(employee.PeriodServiceMinutes), serviceColumnWidth,
+		serviceTableDuration(employee.HistoricalServiceMinutes))
 }
 
 func tableCell(value string, width int) string {
@@ -198,51 +198,4 @@ func renderPeriods(state State, config Config) string {
 		lines = append(lines, "Aún no hay cortes cerrados.")
 	}
 	return strings.Join(lines, "\n")
-}
-
-func money(value int64) string { return fmt.Sprintf("$%s", grouped(value)) }
-
-func serviceDuration(minutes int64) string {
-	if minutes <= 0 {
-		return "0m"
-	}
-	days := minutes / (24 * 60)
-	hours := minutes % (24 * 60) / 60
-	remainingMinutes := minutes % 60
-	parts := make([]string, 0, 3)
-	if days > 0 {
-		parts = append(parts, fmt.Sprintf("%dd", days))
-	}
-	if hours > 0 {
-		parts = append(parts, fmt.Sprintf("%dh", hours))
-	}
-	if remainingMinutes > 0 || len(parts) == 0 {
-		parts = append(parts, fmt.Sprintf("%dm", remainingMinutes))
-	}
-	return strings.Join(parts, " ")
-}
-
-func grouped(value int64) string {
-	negative := value < 0
-	if negative {
-		value = -value
-	}
-	digits := fmt.Sprintf("%d", value)
-	for index := len(digits) - 3; index > 0; index -= 3 {
-		digits = digits[:index] + "," + digits[index:]
-	}
-	if negative {
-		return "-" + digits
-	}
-	return digits
-}
-func discordTime(value time.Time, style string) string {
-	return fmt.Sprintf("<t:%d:%s>", value.Unix(), style)
-}
-
-func nextBoundary(start time.Time) time.Time { return start.AddDate(0, 0, 7) }
-
-func escapeMarkdown(value string) string {
-	replacer := strings.NewReplacer("\\", "\\\\", "*", "\\*", "_", "\\_", "`", "\\`", "~", "\\~")
-	return strings.TrimSpace(replacer.Replace(value))
 }

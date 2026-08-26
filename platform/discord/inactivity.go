@@ -43,6 +43,14 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 	if customID == "" {
 		return
 	}
+	if page, update, ok := inactivityListPage(customID); ok {
+		handler.showInactivityList(session, event, page, update)
+		return
+	}
+	if customID != inactivity.ButtonAddCustomID && customID != inactivity.ButtonRemoveCustomID &&
+		customID != inactivityAddModalID && customID != inactivityRemoveModalID {
+		return
+	}
 	if !canManageRegistry(event) {
 		handler.respond(session, event.Interaction, "No tienes permiso para administrar este registro.")
 		return

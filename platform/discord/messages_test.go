@@ -6,9 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/niflaot/corps-manager/internal/inactivity"
 	"github.com/niflaot/corps-manager/internal/messages"
 	"go.uber.org/zap"
 )
@@ -82,6 +84,14 @@ func TestInactivityInteractionHelpers(t *testing.T) {
 	}}
 	if !canManageRegistry(manager) || canManageRegistry(&discordgo.InteractionCreate{Interaction: &discordgo.Interaction{}}) {
 		t.Fatal("inactivity registry permission check is incorrect")
+	}
+	page, update, ok := inactivityListPage(inactivityListPrefix + "2")
+	if !ok || !update || page != 2 {
+		t.Fatalf("inactivityListPage() = %d, %t, %t", page, update, ok)
+	}
+	content := renderInactivityList([]inactivity.Entry{{Name: "Thomas_Jhonson"}}, 21, 1, 2)
+	if !strings.Contains(content, "Thomas_Jhonson") || !strings.Contains(content, "Página 2/2") {
+		t.Fatalf("renderInactivityList() = %q", content)
 	}
 }
 

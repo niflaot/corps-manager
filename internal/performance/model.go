@@ -1,7 +1,12 @@
 // Package performance tracks business earnings over durable weekly periods.
 package performance
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+	"unicode"
+)
 
 // EmployeeSnapshot is one employee counter returned by SARP.
 type EmployeeSnapshot struct {
@@ -122,4 +127,77 @@ type State struct {
 	Revision uint64 `json:"revision"`
 	// UpdatedAt is the persistence update timestamp.
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+func employeeDisplayName(value string) string {
+	parts := strings.SplitN(strings.TrimSpace(value), "_", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return strings.ReplaceAll(strings.TrimSpace(value), "_", " ")
+	}
+	surname := []rune(parts[1])
+	return parts[0] + " " + string(unicode.ToUpper(surname[0])) + "."
+}
+
+func money(value int64) string { return fmt.Sprintf("$%s", grouped(value)) }
+
+func serviceDuration(minutes int64) string {
+	if minutes <= 0 {
+		return "0m"
+	}
+	days, hours, remaining := minutes/(24*60), minutes%(24*60)/60, minutes%60
+	parts := make([]string, 0, 3)
+	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", days))
+	}
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
+	}
+	if remaining > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%dm", remaining))
+	}
+	return strings.Join(parts, " ")
+}
+
+func serviceTableDuration(minutes int64) string {
+	if minutes >= 24*60 {
+		days, hours := minutes/(24*60), minutes%(24*60)/60
+		if hours == 0 {
+			return fmt.Sprintf("%dd", days)
+		}
+		return fmt.Sprintf("%dd%dh", days, hours)
+	}
+	if minutes >= 60 {
+		hours, remaining := minutes/60, minutes%60
+		if remaining == 0 {
+			return fmt.Sprintf("%dh", hours)
+		}
+		return fmt.Sprintf("%dh%dm", hours, remaining)
+	}
+	return fmt.Sprintf("%dm", max(minutes, 0))
+}
+
+func grouped(value int64) string {
+	negative := value < 0
+	if negative {
+		value = -value
+	}
+	digits := fmt.Sprintf("%d", value)
+	for index := len(digits) - 3; index > 0; index -= 3 {
+		digits = digits[:index] + "," + digits[index:]
+	}
+	if negative {
+		return "-" + digits
+	}
+	return digits
+}
+
+func discordTime(value time.Time, style string) string {
+	return fmt.Sprintf("<t:%d:%s>", value.Unix(), style)
+}
+
+func nextBoundary(start time.Time) time.Time { return start.AddDate(0, 0, 7) }
+
+func escapeMarkdown(value string) string {
+	replacer := strings.NewReplacer("\\", "\\\\", "*", "\\*", "_", "\\_", "`", "\\`", "~", "\\~")
+	return strings.TrimSpace(replacer.Replace(value))
 }

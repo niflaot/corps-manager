@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestAggregateTracksDeltasAndTuesdayCut(t *testing.T) {
@@ -53,9 +54,15 @@ func TestRenderEmployeesGroupsRanksByAuthorityAndAlignsColumns(t *testing.T) {
 		t.Fatalf("rank order is incorrect:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "Empleado") || !strings.Contains(rendered, "$5,000") ||
-		!strings.Contains(rendered, "H semana") ||
+		!strings.Contains(rendered, "H sem") || !strings.Contains(rendered, "Executive N.") ||
+		strings.Contains(rendered, "Executive_Name") ||
 		!strings.Contains(rendered, "```text") {
 		t.Fatalf("employee table is incomplete:\n%s", rendered)
+	}
+	for _, line := range strings.Split(employeeTableHeader()+employeeTableRow(state.Employees["2"]), "\n") {
+		if utf8.RuneCountInString(line) > 50 {
+			t.Fatalf("table line wraps at %d columns: %q", utf8.RuneCountInString(line), line)
+		}
 	}
 }
 

@@ -43,9 +43,12 @@ func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := string(encoded)
-	for _, expected := range []string{"Thomas_Jhonson", ButtonAddCustomID, ButtonRemoveCustomID} {
+	for _, expected := range []string{ButtonListCustomID, ButtonAddCustomID, ButtonRemoveCustomID} {
 		if !strings.Contains(payload, expected) {
 			t.Fatalf("rendered payload does not contain %q: %s", expected, payload)
 		}
+	}
+	if strings.Contains(payload, "Thomas_Jhonson") {
+		t.Fatalf("public dashboard exposes inactivity entries: %s", payload)
 	}
 }
