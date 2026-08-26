@@ -53,3 +53,27 @@ func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 		t.Fatalf("public dashboard exposes inactivity entries: %s", payload)
 	}
 }
+
+func TestDashboardFingerprintChangesWithOpeningButton(t *testing.T) {
+	base := Config{ChannelID: "456", MessageKey: "inactivity-dismissals"}
+	withoutButton, err := Render(nil, base, "123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.AnnouncementChannelID = "789"
+	withButton, err := Render(nil, base, "123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	withoutFingerprint, err := definitionFingerprint(withoutButton)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withFingerprint, err := definitionFingerprint(withButton)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withoutFingerprint == withFingerprint {
+		t.Fatalf("opening button did not change fingerprint: %s", withFingerprint)
+	}
+}

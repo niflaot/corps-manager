@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -81,8 +82,10 @@ func (service *Service) Publish(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	digest := sha256.Sum256([]byte(fmt.Sprint(entries)))
-	payloadKey := hex.EncodeToString(digest[:8])
+	payloadKey, err := definitionFingerprint(definition)
+	if err != nil {
+		return err
+	}
 	for attempt := 0; attempt < publishAttempts; attempt++ {
 		record, getErr := service.messages.Get(ctx, service.config.MessageKey)
 		if errors.Is(getErr, messages.ErrNotFound) {
@@ -103,6 +106,15 @@ func (service *Service) Publish(ctx context.Context) error {
 		return replaceErr
 	}
 	return messages.ErrConflict
+}
+
+func definitionFingerprint(definition messages.Definition) (string, error) {
+	encoded, err := json.Marshal(definition)
+	if err != nil {
+		return "", fmt.Errorf("encode inactivity dashboard fingerprint: %w", err)
+	}
+	digest := sha256.Sum256(encoded)
+	return hex.EncodeToString(digest[:8]), nil
 }
 
 func normalizeName(value string) (string, string, error) {
