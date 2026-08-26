@@ -63,6 +63,9 @@ func renderInactivityList(entries []inactivity.Entry, total int, page int, pageC
 }
 
 func inactivityListButtons(page int, pageCount int) []discordgo.MessageComponent {
+	if pageCount <= 1 {
+		return nil
+	}
 	return []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 		discordgo.Button{Label: "Anterior", Style: discordgo.SecondaryButton,
 			CustomID: inactivityListPrefix + strconv.Itoa(max(page-1, 0)), Disabled: page == 0},

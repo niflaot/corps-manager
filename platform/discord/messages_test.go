@@ -93,6 +93,9 @@ func TestInactivityInteractionHelpers(t *testing.T) {
 	if !strings.Contains(content, "Thomas_Jhonson") || !strings.Contains(content, "Página 2/2") {
 		t.Fatalf("renderInactivityList() = %q", content)
 	}
+	if buttons := inactivityListButtons(0, 1); len(buttons) != 0 {
+		t.Fatalf("single-page controls = %#v", buttons)
+	}
 }
 
 func v2Payload() messages.Payload {
