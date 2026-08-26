@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/messages"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -14,6 +15,7 @@ var Module = fx.Module("discord", fx.Provide(
 	provideClient,
 	fx.Annotate(provideGuildID, fx.ResultTags(`name:"guild_id"`)),
 	fx.Annotate(provideMessageGateway, fx.As(new(messages.Gateway))),
+	fx.Annotate(provideOpeningGateway, fx.As(new(announcements.Gateway))),
 ), fx.Invoke(registerInactivityInteractions))
 
 func provideClient(lifecycle fx.Lifecycle, config Config, log *zap.Logger) (*Client, error) {
@@ -32,3 +34,5 @@ func provideGuildID(config Config) string { return config.GuildID }
 func provideMessageGateway(client *Client, config Config) *MessageGateway {
 	return NewMessageGateway(client, config.GuildID)
 }
+
+func provideOpeningGateway(client *Client) *OpeningGateway { return NewOpeningGateway(client) }

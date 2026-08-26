@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"github.com/niflaot/corps-manager/internal/announcements"
+	announcementspostgres "github.com/niflaot/corps-manager/internal/announcements/postgres"
 	"github.com/niflaot/corps-manager/internal/cronjob"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	inactivitypostgres "github.com/niflaot/corps-manager/internal/inactivity/postgres"
@@ -28,11 +30,13 @@ var Module = fx.Module("bootstrap",
 	messagespostgres.Module,
 	performancepostgres.Module,
 	inactivitypostgres.Module,
+	announcementspostgres.Module,
 	discord.Module,
 	sarp.Module,
 	messages.Module,
 	performance.Module,
 	inactivity.Module,
+	announcements.Module,
 	health.Module,
 	cronjob.Module,
 	httpapi.Module,

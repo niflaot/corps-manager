@@ -2,11 +2,13 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	"go.uber.org/zap"
 )
@@ -98,20 +100,42 @@ func (handler *inactivityInteractionHandler) announceOpening(session *discordgo.
 	event *discordgo.InteractionCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), interactionTimeout)
 	defer cancel()
-	if handler.config.AnnouncementChannelID == "" {
-		handler.respondWithContext(ctx, session, event.Interaction, "❌ El canal de anuncios no está configurado.")
-		return
-	}
 	actor := interactionActor(event)
-	_, err := session.ChannelMessageSendComplex(handler.config.AnnouncementChannelID,
-		openingAnnouncement(actor), discordgo.WithContext(ctx))
+	state, err := handler.announcementService.AnnounceOpening(ctx, actor)
 	if err != nil {
-		handler.log.Error("publish business opening announcement",
-			zap.String("channel_id", handler.config.AnnouncementChannelID), zap.String("actor", actor), zap.Error(err))
+		var active *announcements.CooldownActiveError
+		if errors.As(err, &active) {
+			message := fmt.Sprintf("⏳ La apertura ya fue anunciada. Podrás repetirla <t:%d:R>.",
+				active.State.AvailableAt.Unix())
+			handler.respondWithContext(ctx, session, event.Interaction, message)
+			return
+		}
+		if errors.Is(err, announcements.ErrDisabled) {
+			handler.respondWithContext(ctx, session, event.Interaction,
+				"❌ El canal de anuncios no está configurado.")
+			return
+		}
+		handler.log.Error("publish business opening announcement", zap.String("actor", actor), zap.Error(err))
 		handler.respondWithContext(ctx, session, event.Interaction, "❌ No fue posible publicar la apertura.")
 		return
 	}
-	handler.respondWithContext(ctx, session, event.Interaction, "✅ La apertura fue anunciada correctamente.")
+	message := fmt.Sprintf("✅ La apertura fue anunciada. Disponible nuevamente <t:%d:R>.", state.AvailableAt.Unix())
+	handler.respondWithContext(ctx, session, event.Interaction, message)
+}
+
+// OpeningGateway publishes business-opening announcements through Discord.
+type OpeningGateway struct{ client *Client }
+
+// NewOpeningGateway creates a Discord opening-announcement gateway.
+func NewOpeningGateway(client *Client) *OpeningGateway { return &OpeningGateway{client: client} }
+
+// SendOpening publishes one attributed opening announcement in the configured channel.
+func (gateway *OpeningGateway) SendOpening(ctx context.Context, channelID string, actor string) error {
+	if _, err := gateway.client.session.ChannelMessageSendComplex(channelID, openingAnnouncement(actor),
+		discordgo.WithContext(ctx)); err != nil {
+		return fmt.Errorf("send Discord opening announcement: %w", err)
+	}
+	return nil
 }
 
 func openingAnnouncement(actor string) *discordgo.MessageSend {

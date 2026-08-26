@@ -1,4 +1,4 @@
-# corps-manager v1.3.0
+# corps-manager v1.4.0
 
 Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar expulsiones por inactividad. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
 
@@ -37,6 +37,7 @@ DISCORD_BOT_INACTIVITY_CHANNEL_ID=123456789012345678
 DISCORD_BOT_INACTIVITY_MESSAGE_KEY=inactivity-dismissals
 DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=987654321098765432
+DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
 ```
 
 `DISCORD_BOT_PERFORMANCE_ENDPOINT` debe apuntar al `POST /api/query` de `sarp-scrapper`. El bot envía esta consulta, por lo que el token real de SARP permanece únicamente en `sarp-scrapper`:
@@ -61,6 +62,8 @@ El bot publica un segundo mensaje administrado en `DISCORD_BOT_INACTIVITY_CHANNE
 
 Si `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` está configurado, el mismo panel muestra **Accionar apertura**. Un administrador del registro puede publicar en ese canal un embed de apertura de Benny's Motor, mencionar a `@everyone` y dejar en el footer el nombre visible de quien pulsó el botón. En el canal de anuncios, el bot necesita además `Embed Links` y `Mention Everyone`.
 
+El botón y la API comparten un cooldown persistente de `DISCORD_BOT_ANNOUNCEMENT_COOLDOWN` (30 minutos por defecto). La adquisición es atómica, sobrevive reinicios y evita anuncios duplicados por pulsaciones simultáneas. Si Discord rechaza la publicación, el cooldown se libera automáticamente.
+
 ## Base de datos
 
 Ejecuta Liquibase antes del servicio:
@@ -71,7 +74,7 @@ liquibase --defaults-file=database/liquibase.properties validate
 liquibase --defaults-file=database/liquibase.properties update
 ```
 
-Los changelogs de dominio están en `internal/messages/postgres/`, `internal/performance/postgres/` e `internal/inactivity/postgres/`. La aplicación no modifica el esquema durante el arranque.
+Los changelogs de dominio están en `internal/messages/postgres/`, `internal/performance/postgres/`, `internal/inactivity/postgres/` e `internal/announcements/postgres/`. La aplicación no modifica el esquema durante el arranque.
 
 ## Ejecutar
 
@@ -91,6 +94,9 @@ Rutas protegidas con `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
 - `GET /api/inactivity`: consulta el registro de expulsados.
 - `POST /api/inactivity` con `{"name":"Nombre_Apellido"}`: añade un empleado.
 - `DELETE /api/inactivity/Nombre_Apellido`: retira un empleado.
+- `POST /api/announcements/opening` con body opcional `{"actor":"Thomas J."}`: publica la apertura y activa el cooldown.
+- `GET /api/announcements/opening/cooldown`: consulta quién anunció y cuándo vuelve a estar disponible.
+- `DELETE /api/announcements/opening/cooldown`: libera inmediatamente el cooldown.
 - `/api/messages`: administración genérica de mensajes editables.
 
 Ejemplo de actualización manual:
@@ -100,11 +106,24 @@ curl -X POST http://127.0.0.1:3100/api/performance/refresh \
   -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
 ```
 
+Ejemplo de apertura y liberación manual:
+
+```sh
+curl -X POST https://corps.niflaot.dev/api/announcements/opening \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"actor":"Thomas J."}'
+
+curl -X DELETE https://corps.niflaot.dev/api/announcements/opening/cooldown \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+```
+
 ## Estructura
 
 - `internal/messages/`: mensajes durables y reconciliación con Discord.
 - `internal/performance/`: periodos, deltas, histórico y dashboard.
 - `internal/inactivity/`: registro durable, formulario y segundo mensaje.
+- `internal/announcements/`: apertura pública y cooldown durable compartido.
 - `platform/sarp/`: cliente del endpoint configurable de `sarp-scrapper`.
 - `platform/httpapi/`: API Fiber y contrato OpenAPI/Scalar.
 - `platform/discord/`: sesión DiscordGo y gateway de mensajes.

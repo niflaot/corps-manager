@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -20,14 +21,16 @@ const (
 )
 
 type inactivityInteractionHandler struct {
-	service *inactivity.Service
-	config  inactivity.Config
-	log     *zap.Logger
+	service             *inactivity.Service
+	announcementService *announcements.Service
+	config              inactivity.Config
+	log                 *zap.Logger
 }
 
 func registerInactivityInteractions(lifecycle fx.Lifecycle, client *Client, service *inactivity.Service,
-	config inactivity.Config, log *zap.Logger) {
-	handler := &inactivityInteractionHandler{service: service, config: config, log: log}
+	announcementService *announcements.Service, config inactivity.Config, log *zap.Logger) {
+	handler := &inactivityInteractionHandler{service: service, announcementService: announcementService,
+		config: config, log: log}
 	remove := client.AddHandler(handler.handle)
 	lifecycle.Append(fx.Hook{OnStop: func(context.Context) error {
 		remove()

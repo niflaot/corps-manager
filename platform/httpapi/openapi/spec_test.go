@@ -31,7 +31,10 @@ func TestSpecProtectsPrivateOperations(t *testing.T) {
 	}
 	privateOperations := [][2]string{{"/api/performance", "get"},
 		{"/api/performance/refresh", "post"}, {"/api/inactivity", "get"}, {"/api/inactivity", "post"},
-		{"/api/inactivity/{name}", "delete"}, {"/api/messages", "get"}, {"/api/messages", "post"}}
+		{"/api/inactivity/{name}", "delete"}, {"/api/announcements/opening", "post"},
+		{"/api/announcements/opening/cooldown", "get"},
+		{"/api/announcements/opening/cooldown", "delete"}, {"/api/messages", "get"},
+		{"/api/messages", "post"}}
 	for _, operation := range privateOperations {
 		if len(selectOperation(document.Paths[operation[0]], operation[1]).Security) == 0 {
 			t.Fatalf("private operation %s %s does not require API authentication", operation[1], operation[0])

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/contrib/fiberzap"
 	"github.com/gofiber/fiber/v2"
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	"github.com/niflaot/corps-manager/internal/messages"
 	"github.com/niflaot/corps-manager/internal/performance"
@@ -48,6 +49,16 @@ type InactivityService interface {
 	Remove(context.Context, string) error
 }
 
+// AnnouncementService contains HTTP-facing opening-announcement use cases.
+type AnnouncementService interface {
+	// AnnounceOpening publishes an opening if its cooldown is available.
+	AnnounceOpening(context.Context, string) (announcements.State, error)
+	// GetCooldown returns the persisted opening cooldown.
+	GetCooldown(context.Context) (announcements.State, error)
+	// ClearCooldown makes the opening announcement immediately available.
+	ClearCooldown(context.Context) error
+}
+
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
 	// Messages manages static Discord message definitions.
@@ -56,12 +67,20 @@ type Dependencies struct {
 	Performance PerformanceService
 	// Inactivity manages employees dismissed for inactivity.
 	Inactivity InactivityService
+	// Announcements manages public business-opening announcements.
+	Announcements AnnouncementService
 }
 
 // InactivityMutationRequest contains one Nombre_Apellido registry value.
 type InactivityMutationRequest struct {
 	// Name is the employee roleplay name.
 	Name string `json:"name"`
+}
+
+// OpeningAnnouncementRequest contains optional announcement attribution.
+type OpeningAnnouncementRequest struct {
+	// Actor is shown in the Discord embed footer.
+	Actor string `json:"actor"`
 }
 
 // ErrorResponse is a JSON error response body.

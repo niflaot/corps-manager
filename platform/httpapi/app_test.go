@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/health"
@@ -18,6 +20,27 @@ import (
 type inactivityHTTPStub struct {
 	items   []inactivity.Entry
 	removed string
+}
+
+type announcementHTTPStub struct {
+	state   announcements.State
+	actor   string
+	cleared bool
+	err     error
+}
+
+func (stub *announcementHTTPStub) AnnounceOpening(_ context.Context, actor string) (announcements.State, error) {
+	stub.actor = actor
+	return stub.state, stub.err
+}
+
+func (stub *announcementHTTPStub) GetCooldown(context.Context) (announcements.State, error) {
+	return stub.state, stub.err
+}
+
+func (stub *announcementHTTPStub) ClearCooldown(context.Context) error {
+	stub.cleared = true
+	return stub.err
 }
 
 func (stub *inactivityHTTPStub) List(context.Context) ([]inactivity.Entry, error) {
@@ -101,4 +124,53 @@ func TestInactivityRoutesRequireAuthenticationAndMutateRegistry(t *testing.T) {
 	if err != nil || deleted.StatusCode != http.StatusNoContent || stub.removed != "Thomas_Jhonson" {
 		t.Fatalf("delete status = %d, removed = %q, error = %v", deleted.StatusCode, stub.removed, err)
 	}
+}
+
+func TestAnnouncementRoutesPublishInspectAndClearCooldown(t *testing.T) {
+	stub := &announcementHTTPStub{state: announcements.State{Key: announcements.OpeningCooldownKey,
+		Actor: "Thomas J.", AnnouncedAt: time.Now(), AvailableAt: time.Now().Add(30 * time.Minute)}}
+	application := New(zap.NewNop(), appconfig.Config{Environment: appconfig.EnvironmentTest},
+		Config{APIKey: "test-api-key-long", BodyLimit: 1 << 20}, health.New(nil),
+		Dependencies{Announcements: stub}, "1.0.0")
+
+	unauthorized, err := application.Test(httptest.NewRequest(http.MethodPost, "/api/announcements/opening", nil))
+	if err != nil || unauthorized.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status = %d, error = %v", unauthorized.StatusCode, err)
+	}
+	request := authenticatedRequest(http.MethodPost, "/api/announcements/opening", `{"actor":"Thomas J."}`)
+	created, err := application.Test(request)
+	if err != nil || created.StatusCode != http.StatusCreated || stub.actor != "Thomas J." {
+		t.Fatalf("create status = %d, actor = %q, error = %v", created.StatusCode, stub.actor, err)
+	}
+	read, err := application.Test(authenticatedRequest(http.MethodGet,
+		"/api/announcements/opening/cooldown", ""))
+	if err != nil || read.StatusCode != http.StatusOK {
+		t.Fatalf("read status = %d, error = %v", read.StatusCode, err)
+	}
+	deleted, err := application.Test(authenticatedRequest(http.MethodDelete,
+		"/api/announcements/opening/cooldown", ""))
+	if err != nil || deleted.StatusCode != http.StatusNoContent || !stub.cleared {
+		t.Fatalf("delete status = %d, cleared = %v, error = %v", deleted.StatusCode, stub.cleared, err)
+	}
+}
+
+func TestAnnouncementRouteReturnsTooManyRequestsDuringCooldown(t *testing.T) {
+	stub := &announcementHTTPStub{err: &announcements.CooldownActiveError{State: announcements.State{
+		AvailableAt: time.Now().Add(time.Minute)}}}
+	application := New(zap.NewNop(), appconfig.Config{Environment: appconfig.EnvironmentTest},
+		Config{APIKey: "test-api-key-long", BodyLimit: 1 << 20}, health.New(nil),
+		Dependencies{Announcements: stub}, "1.0.0")
+	response, err := application.Test(authenticatedRequest(http.MethodPost, "/api/announcements/opening", ""))
+	if err != nil || response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("cooldown status = %d, error = %v", response.StatusCode, err)
+	}
+}
+
+func authenticatedRequest(method string, path string, body string) *http.Request {
+	request := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	request.Header.Set("Authorization", "Bearer test-api-key-long")
+	if body != "" {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	return request
 }

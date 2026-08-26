@@ -6,6 +6,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/gofiber/fiber/v2"
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	"github.com/niflaot/corps-manager/internal/messages"
 	"github.com/niflaot/corps-manager/internal/performance"
@@ -45,8 +46,9 @@ func LoadConfig() (Config, error) {
 }
 
 func provideDependencies(messageService *messages.Service, performanceService *performance.Service,
-	inactivityService *inactivity.Service) Dependencies {
-	return Dependencies{Messages: messageService, Performance: performanceService, Inactivity: inactivityService}
+	inactivityService *inactivity.Service, announcementService *announcements.Service) Dependencies {
+	return Dependencies{Messages: messageService, Performance: performanceService, Inactivity: inactivityService,
+		Announcements: announcementService}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

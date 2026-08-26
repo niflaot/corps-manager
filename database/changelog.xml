@@ -8,4 +8,5 @@
     <include file="../internal/messages/postgres/changelog.xml" relativeToChangelogFile="true"/>
     <include file="../internal/performance/postgres/changelog.xml" relativeToChangelogFile="true"/>
     <include file="../internal/inactivity/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="../internal/announcements/postgres/changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

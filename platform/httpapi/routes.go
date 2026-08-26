@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/niflaot/corps-manager/internal/announcements"
 	"github.com/niflaot/corps-manager/internal/inactivity"
 	"github.com/niflaot/corps-manager/internal/performance"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
@@ -32,8 +33,41 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 	if dependencies.Inactivity != nil {
 		registerInactivityRoutes(application.Group("/api/inactivity", authenticate(apiConfig.APIKey)), dependencies.Inactivity)
 	}
+	if dependencies.Announcements != nil {
+		registerAnnouncementRoutes(application.Group("/api/announcements", authenticate(apiConfig.APIKey)),
+			dependencies.Announcements)
+	}
 	application.Use(func(*fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "route not found")
+	})
+}
+
+func registerAnnouncementRoutes(router fiber.Router, service AnnouncementService) {
+	router.Post("/opening", func(ctx *fiber.Ctx) error {
+		var request OpeningAnnouncementRequest
+		if len(ctx.Body()) > 0 {
+			if err := ctx.BodyParser(&request); err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
+			}
+		}
+		state, err := service.AnnounceOpening(ctx.UserContext(), request.Actor)
+		if err != nil {
+			return announcementError(err)
+		}
+		return ctx.Status(fiber.StatusCreated).JSON(state)
+	})
+	router.Get("/opening/cooldown", func(ctx *fiber.Ctx) error {
+		state, err := service.GetCooldown(ctx.UserContext())
+		if err != nil {
+			return announcementError(err)
+		}
+		return ctx.JSON(state)
+	})
+	router.Delete("/opening/cooldown", func(ctx *fiber.Ctx) error {
+		if err := service.ClearCooldown(ctx.UserContext()); err != nil {
+			return announcementError(err)
+		}
+		return ctx.SendStatus(fiber.StatusNoContent)
 	})
 }
 
@@ -128,5 +162,20 @@ func inactivityError(err error) error {
 		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
 	default:
 		return fiber.NewError(fiber.StatusInternalServerError, "inactivity registry operation failed")
+	}
+}
+
+func announcementError(err error) error {
+	switch {
+	case errors.Is(err, announcements.ErrInvalidActor):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, announcements.ErrNotFound):
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, announcements.ErrCooldownActive):
+		return fiber.NewError(fiber.StatusTooManyRequests, err.Error())
+	case errors.Is(err, announcements.ErrDisabled):
+		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
+	default:
+		return fiber.NewError(fiber.StatusBadGateway, "opening announcement failed")
 	}
 }
