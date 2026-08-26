@@ -15,14 +15,83 @@ services:
       - fl-network
 
   mt-discord-bot:
-    image: ${DISCORD_BOT_IMAGE:-ghcr.io/pixelados-net/discord-bot:v1.2.0}
+    image: ${DISCORD_BOT_GO_IMAGE:?DISCORD_BOT_GO_IMAGE is required}
     container_name: mt-discord-bot
     restart: unless-stopped
     init: true
     depends_on:
       mt-discord-bot-migrations:
         condition: service_completed_successfully
+    working_dir: /workspace/source
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+          set -Eeuo pipefail
+
+          : "$${DISCORD_BOT_REPOSITORY_URL:?DISCORD_BOT_REPOSITORY_URL is required}"
+          : "$${DISCORD_BOT_GIT_REF:?DISCORD_BOT_GIT_REF is required}"
+
+          readonly workspace=/workspace
+          readonly source_directory="$${workspace}/source"
+          readonly binary_directory="$${workspace}/bin"
+          readonly binary_path="$${binary_directory}/discord-bot"
+          readonly temporary_binary="$${binary_path}.tmp"
+          readonly commit_state="$${binary_directory}/commit"
+
+          if [[ ! -d "$${source_directory}/.git" ]]; then
+            if [[ -e "$${source_directory}" ]] && [[ -n "$$(find "$${source_directory}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+              echo "$${source_directory} exists but is not an empty Git checkout." >&2
+              exit 1
+            fi
+            git clone --no-checkout "$${DISCORD_BOT_REPOSITORY_URL}" "$${source_directory}"
+          fi
+
+          current_origin="$$(git -C "$${source_directory}" remote get-url origin)"
+          if [[ "$${current_origin}" != "$${DISCORD_BOT_REPOSITORY_URL}" ]]; then
+            echo "Refusing to update $${source_directory}: its origin does not match DISCORD_BOT_REPOSITORY_URL." >&2
+            exit 1
+          fi
+
+          git -C "$${source_directory}" fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+          resolved_commit=""
+          for candidate in "refs/remotes/origin/$${DISCORD_BOT_GIT_REF}" "refs/tags/$${DISCORD_BOT_GIT_REF}" "$${DISCORD_BOT_GIT_REF}"; do
+            if resolved_commit="$$(git -C "$${source_directory}" rev-parse --verify "$${candidate}^{commit}" 2>/dev/null)"; then
+              break
+            fi
+          done
+
+          if [[ -z "$${resolved_commit}" ]]; then
+            echo "DISCORD_BOT_GIT_REF '$${DISCORD_BOT_GIT_REF}' does not resolve to a branch, tag, or commit." >&2
+            exit 1
+          fi
+
+          git -C "$${source_directory}" checkout --detach --force "$${resolved_commit}"
+          git -C "$${source_directory}" clean -ffd
+
+          mkdir -p "$${binary_directory}"
+          trap 'rm -f "$${temporary_binary}"' EXIT
+
+          if [[ ! -x "$${binary_path}" || "$$(cat "$${commit_state}" 2>/dev/null || true)" != "$${resolved_commit}" ]]; then
+            go mod download
+            CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$${resolved_commit}" -o "$${temporary_binary}" ./cmd
+            mv "$${temporary_binary}" "$${binary_path}"
+            printf '%s' "$${resolved_commit}" > "$${commit_state}"
+            echo "Built discord-bot from $${resolved_commit}."
+          else
+            echo "Reusing discord-bot built from $${resolved_commit}."
+          fi
+
+          exec "$${binary_path}"
+    volumes:
+      - mt-discord-bot-workspace:/workspace
     environment:
+      DISCORD_BOT_REPOSITORY_URL: "${DISCORD_BOT_REPOSITORY_URL:?DISCORD_BOT_REPOSITORY_URL is required}"
+      DISCORD_BOT_GIT_REF: "${DISCORD_BOT_GIT_REF:?DISCORD_BOT_GIT_REF is required}"
+      GIT_TERMINAL_PROMPT: "0"
+      GOTOOLCHAIN: local
+
       DISCORD_BOT_ENVIRONMENT: production
       DISCORD_BOT_HOST: 0.0.0.0
       DISCORD_BOT_PORT: "3100"
@@ -60,6 +129,10 @@ services:
       DISCORD_BOT_POSTGRES_HEALTH_TIMEOUT: "${DISCORD_BOT_POSTGRES_HEALTH_TIMEOUT:-2s}"
     networks:
       - fl-network
+
+volumes:
+  mt-discord-bot-workspace:
+    name: mt-discord-bot-workspace
 
 networks:
   fl-network:
