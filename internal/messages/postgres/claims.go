@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 // MarkDue schedules one managed message for immediate reconciliation.

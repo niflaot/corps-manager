@@ -4,10 +4,11 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/pixelados-net/discord-bot/internal/performance"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/health"
-	"github.com/pixelados-net/discord-bot/platform/httpapi/openapi"
+	"github.com/niflaot/corps-manager/internal/inactivity"
+	"github.com/niflaot/corps-manager/internal/performance"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/health"
+	"github.com/niflaot/corps-manager/platform/httpapi/openapi"
 )
 
 func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig Config, healthService *health.Service, dependencies Dependencies, version string) {
@@ -28,8 +29,38 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 	if dependencies.Performance != nil {
 		registerPerformanceRoutes(application.Group("/api/performance", authenticate(apiConfig.APIKey)), dependencies.Performance)
 	}
+	if dependencies.Inactivity != nil {
+		registerInactivityRoutes(application.Group("/api/inactivity", authenticate(apiConfig.APIKey)), dependencies.Inactivity)
+	}
 	application.Use(func(*fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "route not found")
+	})
+}
+
+func registerInactivityRoutes(router fiber.Router, service InactivityService) {
+	router.Get("/", func(ctx *fiber.Ctx) error {
+		entries, err := service.List(ctx.UserContext())
+		if err != nil {
+			return inactivityError(err)
+		}
+		return ctx.JSON(fiber.Map{"items": entries, "total": len(entries)})
+	})
+	router.Post("/", func(ctx *fiber.Ctx) error {
+		var request InactivityMutationRequest
+		if err := ctx.BodyParser(&request); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
+		}
+		entry, err := service.Add(ctx.UserContext(), request.Name, "api")
+		if err != nil {
+			return inactivityError(err)
+		}
+		return ctx.Status(fiber.StatusCreated).JSON(entry)
+	})
+	router.Delete("/:name", func(ctx *fiber.Ctx) error {
+		if err := service.Remove(ctx.UserContext(), ctx.Params("name")); err != nil {
+			return inactivityError(err)
+		}
+		return ctx.SendStatus(fiber.StatusNoContent)
 	})
 }
 
@@ -82,5 +113,20 @@ func performanceError(err error) error {
 		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
 	default:
 		return fiber.NewError(fiber.StatusBadGateway, "performance refresh failed")
+	}
+}
+
+func inactivityError(err error) error {
+	switch {
+	case errors.Is(err, inactivity.ErrInvalidName):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, inactivity.ErrAlreadyExists):
+		return fiber.NewError(fiber.StatusConflict, err.Error())
+	case errors.Is(err, inactivity.ErrNotFound):
+		return fiber.NewError(fiber.StatusNotFound, err.Error())
+	case errors.Is(err, inactivity.ErrDisabled):
+		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
+	default:
+		return fiber.NewError(fiber.StatusInternalServerError, "inactivity registry operation failed")
 	}
 }

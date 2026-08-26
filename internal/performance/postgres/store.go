@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pixelados-net/discord-bot/internal/performance"
+	"github.com/niflaot/corps-manager/internal/performance"
 )
 
 // Store is the PostgreSQL performance repository.

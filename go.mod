@@ -1,4 +1,4 @@
-module github.com/pixelados-net/discord-bot
+module github.com/niflaot/corps-manager
 
 go 1.26.1
 

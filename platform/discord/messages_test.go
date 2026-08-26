@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 	"go.uber.org/zap"
 )
 
@@ -65,6 +65,23 @@ func TestMessageGatewayBlocksAmbiguousCreate(t *testing.T) {
 	_, err := gateway.Create(context.Background(), messages.CreateRequest{ChannelID: "456", Nonce: "stable", Payload: v2Payload()})
 	if !errors.Is(err, messages.ErrAmbiguousCreate) {
 		t.Fatalf("Create() error = %v", err)
+	}
+}
+
+func TestInactivityInteractionHelpers(t *testing.T) {
+	data := discordgo.ModalSubmitInteractionData{Components: []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.TextInput{CustomID: inactivityNameInputID, Value: "Thomas_Jhonson"},
+		}},
+	}}
+	if value := modalInput(data, inactivityNameInputID); value != "Thomas_Jhonson" {
+		t.Fatalf("modalInput() = %q", value)
+	}
+	manager := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
+		Member: &discordgo.Member{Permissions: discordgo.PermissionManageMessages},
+	}}
+	if !canManageRegistry(manager) || canManageRegistry(&discordgo.InteractionCreate{Interaction: &discordgo.Interaction{}}) {
+		t.Fatal("inactivity registry permission check is incorrect")
 	}
 }
 

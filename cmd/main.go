@@ -9,10 +9,10 @@ import (
 	"syscall"
 	_ "time/tzdata"
 
-	"github.com/pixelados-net/discord-bot/platform/cli"
+	"github.com/niflaot/corps-manager/platform/cli"
 )
 
-var version = "1.2.0"
+var version = "1.3.0"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

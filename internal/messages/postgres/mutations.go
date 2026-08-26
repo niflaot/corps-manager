@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 // Create persists one idempotent managed-message definition.

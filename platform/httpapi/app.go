@@ -6,10 +6,11 @@ import (
 
 	"github.com/gofiber/contrib/fiberzap"
 	"github.com/gofiber/fiber/v2"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/internal/performance"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/health"
+	"github.com/niflaot/corps-manager/internal/inactivity"
+	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/performance"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/health"
 	"go.uber.org/zap"
 )
 
@@ -37,12 +38,30 @@ type PerformanceService interface {
 	Refresh(context.Context) (performance.State, error)
 }
 
+// InactivityService contains HTTP-facing inactivity registry use cases.
+type InactivityService interface {
+	// List returns all inactivity dismissal entries.
+	List(context.Context) ([]inactivity.Entry, error)
+	// Add registers one employee dismissal.
+	Add(context.Context, string, string) (inactivity.Entry, error)
+	// Remove deletes one employee dismissal.
+	Remove(context.Context, string) error
+}
+
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
 	// Messages manages static Discord message definitions.
 	Messages MessageService
 	// Performance manages business earnings collection.
 	Performance PerformanceService
+	// Inactivity manages employees dismissed for inactivity.
+	Inactivity InactivityService
+}
+
+// InactivityMutationRequest contains one Nombre_Apellido registry value.
+type InactivityMutationRequest struct {
+	// Name is the employee roleplay name.
+	Name string `json:"name"`
 }
 
 // ErrorResponse is a JSON error response body.

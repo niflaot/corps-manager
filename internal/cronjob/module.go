@@ -1,7 +1,7 @@
 package cronjob
 
 import (
-	"github.com/pixelados-net/discord-bot/platform/clock"
+	"github.com/niflaot/corps-manager/platform/clock"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )

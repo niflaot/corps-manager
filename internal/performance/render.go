@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 const (
 	dashboardAccent       = 0x2ecc71
-	employeeColumnWidth   = 22
-	moneyColumnWidth      = 12
+	employeeColumnWidth   = 20
+	moneyColumnWidth      = 11
+	serviceColumnWidth    = 10
 	employeesContentLimit = 3000
 )
 
@@ -44,8 +45,9 @@ func Render(state State, config Config, guildID string) (messages.Definition, er
 	components := []any{
 		textDisplay{Type: 10, Content: fmt.Sprintf("# 📊 %s\n`Negocio #%d`", name, state.BusinessID)},
 		separator{Type: 14, Divider: true, Spacing: 1},
-		textDisplay{Type: 10, Content: fmt.Sprintf("## Resumen\n**Histórico registrado:** %s\n**Periodo actual:** %s\n**Banco:** %s",
-			money(state.HistoricalGenerated), money(state.PeriodGenerated), money(state.Bank))},
+		textDisplay{Type: 10, Content: fmt.Sprintf("## Resumen\n**Dinero histórico:** %s\n**Dinero del periodo:** %s\n**Servicio histórico:** %s\n**Servicio del periodo:** %s\n**Banco:** %s",
+			money(state.HistoricalGenerated), money(state.PeriodGenerated), serviceDuration(state.HistoricalServiceMinutes),
+			serviceDuration(state.PeriodServiceMinutes), money(state.Bank))},
 		textDisplay{Type: 10, Content: renderEmployees(state)},
 		separator{Type: 14, Divider: true, Spacing: 1},
 		textDisplay{Type: 10, Content: renderPeriods(state, config)},
@@ -90,7 +92,7 @@ func renderEmployees(state State) string {
 		group.Employees = append(group.Employees, employee)
 	}
 	if len(groupsByKey) == 0 {
-		return "## Empleados\nSin empleados en la respuesta actual."
+		return "Sin empleados en la respuesta actual."
 	}
 	groups := make([]employeeRankGroup, 0, len(groupsByKey))
 	for _, group := range groupsByKey {
@@ -109,7 +111,6 @@ func renderEmployees(state State) string {
 	sort.Slice(groups, func(i, j int) bool { return higherRank(groups[i], groups[j]) })
 
 	var rendered strings.Builder
-	rendered.WriteString("## Empleados\n`Agrupados por rango · mayor autoridad primero`\n")
 	truncated := false
 groupsLoop:
 	for _, group := range groups {
@@ -161,17 +162,18 @@ func higherRank(left, right employeeRankGroup) bool {
 	}
 	return strings.ToLower(left.Rank.Name) < strings.ToLower(right.Rank.Name)
 }
-
 func employeeTableHeader() string {
-	return fmt.Sprintf("%-*s %*s %*s\n%s %s %s\n", employeeColumnWidth, "Empleado", moneyColumnWidth,
-		"Semanal", moneyColumnWidth, "Histórico", strings.Repeat("-", employeeColumnWidth),
-		strings.Repeat("-", moneyColumnWidth), strings.Repeat("-", moneyColumnWidth))
+	return fmt.Sprintf("%-*s %*s %*s %*s %*s\n%s %s %s %s %s\n", employeeColumnWidth, "Empleado",
+		moneyColumnWidth, "$ semana", moneyColumnWidth, "$ total", serviceColumnWidth, "H semana",
+		serviceColumnWidth, "H total", strings.Repeat("-", employeeColumnWidth),
+		strings.Repeat("-", moneyColumnWidth), strings.Repeat("-", moneyColumnWidth),
+		strings.Repeat("-", serviceColumnWidth), strings.Repeat("-", serviceColumnWidth))
 }
-
 func employeeTableRow(employee EmployeeState) string {
 	name := tableCell(employee.Name, employeeColumnWidth)
-	return fmt.Sprintf("%-*s %*s %*s\n", employeeColumnWidth, name, moneyColumnWidth,
-		money(employee.PeriodGenerated), moneyColumnWidth, money(employee.HistoricalGenerated))
+	return fmt.Sprintf("%-*s %*s %*s %*s %*s\n", employeeColumnWidth, name, moneyColumnWidth,
+		money(employee.PeriodGenerated), moneyColumnWidth, money(employee.HistoricalGenerated), serviceColumnWidth,
+		serviceDuration(employee.PeriodServiceMinutes), serviceColumnWidth, serviceDuration(employee.HistoricalServiceMinutes))
 }
 
 func tableCell(value string, width int) string {
@@ -188,8 +190,9 @@ func renderPeriods(state State, config Config) string {
 	lines := []string{fmt.Sprintf("## Cortes semanales\nPeriodo activo desde **%s**", start)}
 	limit := min(len(state.Periods), 4)
 	for _, period := range state.Periods[:limit] {
-		lines = append(lines, fmt.Sprintf("%s → %s: **%s**", period.StartedAt.In(config.Timezone).Format("02 Jan"),
-			period.EndedAt.In(config.Timezone).Format("02 Jan"), money(period.Generated)))
+		lines = append(lines, fmt.Sprintf("%s → %s: **%s** · **%s de servicio**",
+			period.StartedAt.In(config.Timezone).Format("02 Jan"), period.EndedAt.In(config.Timezone).Format("02 Jan"),
+			money(period.Generated), serviceDuration(period.ServiceMinutes)))
 	}
 	if limit == 0 {
 		lines = append(lines, "Aún no hay cortes cerrados.")
@@ -198,6 +201,26 @@ func renderPeriods(state State, config Config) string {
 }
 
 func money(value int64) string { return fmt.Sprintf("$%s", grouped(value)) }
+
+func serviceDuration(minutes int64) string {
+	if minutes <= 0 {
+		return "0m"
+	}
+	days := minutes / (24 * 60)
+	hours := minutes % (24 * 60) / 60
+	remainingMinutes := minutes % 60
+	parts := make([]string, 0, 3)
+	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", days))
+	}
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
+	}
+	if remainingMinutes > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%dm", remainingMinutes))
+	}
+	return strings.Join(parts, " ")
+}
 
 func grouped(value int64) string {
 	negative := value < 0
@@ -213,7 +236,6 @@ func grouped(value int64) string {
 	}
 	return digits
 }
-
 func discordTime(value time.Time, style string) string {
 	return fmt.Sprintf("<t:%d:%s>", value.Unix(), style)
 }

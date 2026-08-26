@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/platform/discord"
-	"github.com/pixelados-net/discord-bot/platform/httpapi"
+	"github.com/niflaot/corps-manager/internal/cronjob"
+	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/platform/discord"
+	"github.com/niflaot/corps-manager/platform/httpapi"
 	"go.uber.org/fx"
 	"golang.org/x/sync/errgroup"
 )

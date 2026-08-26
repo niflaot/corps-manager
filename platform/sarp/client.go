@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pixelados-net/discord-bot/internal/performance"
+	"github.com/niflaot/corps-manager/internal/performance"
 )
 
 const userAgent = "discord-bot-business-performance/1.0"

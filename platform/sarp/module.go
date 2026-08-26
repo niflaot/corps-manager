@@ -1,7 +1,7 @@
 package sarp
 
 import (
-	"github.com/pixelados-net/discord-bot/internal/performance"
+	"github.com/niflaot/corps-manager/internal/performance"
 	"go.uber.org/fx"
 )
 

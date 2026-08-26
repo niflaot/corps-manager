@@ -6,10 +6,11 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/gofiber/fiber/v2"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/internal/performance"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/health"
+	"github.com/niflaot/corps-manager/internal/inactivity"
+	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/performance"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/health"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -43,8 +44,9 @@ func LoadConfig() (Config, error) {
 	return config, nil
 }
 
-func provideDependencies(messageService *messages.Service, performanceService *performance.Service) Dependencies {
-	return Dependencies{Messages: messageService, Performance: performanceService}
+func provideDependencies(messageService *messages.Service, performanceService *performance.Service,
+	inactivityService *inactivity.Service) Dependencies {
+	return Dependencies{Messages: messageService, Performance: performanceService, Inactivity: inactivityService}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

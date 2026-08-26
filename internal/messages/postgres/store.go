@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 const recordColumns = `id::text, key, guild_id, channel_id, coalesce(discord_message_id, ''), payload,

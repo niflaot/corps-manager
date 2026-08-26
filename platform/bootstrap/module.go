@@ -1,19 +1,21 @@
 package bootstrap
 
 import (
-	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	messagespostgres "github.com/pixelados-net/discord-bot/internal/messages/postgres"
-	"github.com/pixelados-net/discord-bot/internal/performance"
-	performancepostgres "github.com/pixelados-net/discord-bot/internal/performance/postgres"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/clock"
-	"github.com/pixelados-net/discord-bot/platform/discord"
-	"github.com/pixelados-net/discord-bot/platform/health"
-	"github.com/pixelados-net/discord-bot/platform/httpapi"
-	"github.com/pixelados-net/discord-bot/platform/logger"
-	"github.com/pixelados-net/discord-bot/platform/postgres"
-	"github.com/pixelados-net/discord-bot/platform/sarp"
+	"github.com/niflaot/corps-manager/internal/cronjob"
+	"github.com/niflaot/corps-manager/internal/inactivity"
+	inactivitypostgres "github.com/niflaot/corps-manager/internal/inactivity/postgres"
+	"github.com/niflaot/corps-manager/internal/messages"
+	messagespostgres "github.com/niflaot/corps-manager/internal/messages/postgres"
+	"github.com/niflaot/corps-manager/internal/performance"
+	performancepostgres "github.com/niflaot/corps-manager/internal/performance/postgres"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/clock"
+	"github.com/niflaot/corps-manager/platform/discord"
+	"github.com/niflaot/corps-manager/platform/health"
+	"github.com/niflaot/corps-manager/platform/httpapi"
+	"github.com/niflaot/corps-manager/platform/logger"
+	"github.com/niflaot/corps-manager/platform/postgres"
+	"github.com/niflaot/corps-manager/platform/sarp"
 	"go.uber.org/fx"
 )
 
@@ -25,10 +27,12 @@ var Module = fx.Module("bootstrap",
 	postgres.Module,
 	messagespostgres.Module,
 	performancepostgres.Module,
+	inactivitypostgres.Module,
 	discord.Module,
 	sarp.Module,
 	messages.Module,
 	performance.Module,
+	inactivity.Module,
 	health.Module,
 	cronjob.Module,
 	httpapi.Module,

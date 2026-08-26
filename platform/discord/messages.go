@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 )
 
 // MessageGateway adapts the configured Discord session to managed messages.

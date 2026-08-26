@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"go.uber.org/zap"
 )
 

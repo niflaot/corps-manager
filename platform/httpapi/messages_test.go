@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/health"
+	"github.com/niflaot/corps-manager/internal/messages"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/health"
 	"go.uber.org/zap"
 )
 

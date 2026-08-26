@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/platform/clock"
+	"github.com/niflaot/corps-manager/platform/clock"
 	"go.uber.org/zap"
 )
 

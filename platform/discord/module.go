@@ -3,7 +3,7 @@ package discord
 import (
 	"context"
 
-	"github.com/pixelados-net/discord-bot/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -14,7 +14,7 @@ var Module = fx.Module("discord", fx.Provide(
 	provideClient,
 	fx.Annotate(provideGuildID, fx.ResultTags(`name:"guild_id"`)),
 	fx.Annotate(provideMessageGateway, fx.As(new(messages.Gateway))),
-))
+), fx.Invoke(registerInactivityInteractions))
 
 func provideClient(lifecycle fx.Lifecycle, config Config, log *zap.Logger) (*Client, error) {
 	client, err := New(config, log)

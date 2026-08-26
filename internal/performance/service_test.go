@@ -14,20 +14,25 @@ func TestAggregateTracksDeltasAndTuesdayCut(t *testing.T) {
 	service := &Service{config: Config{CutoffWeekday: time.Tuesday, Timezone: location, HistoryLimit: 10}}
 	initialTime := time.Date(2026, time.August, 19, 12, 0, 0, 0, location)
 	state := service.aggregate(State{BusinessID: 1995}, Snapshot{BusinessID: 1995, Name: "Market", Bank: 500,
-		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 100},
-			{CharacterID: 2, Name: "Bob", Earnings: 50}}}, initialTime)
-	if state.HistoricalGenerated != 150 || state.PeriodGenerated != 0 {
+		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 100, HistoricalDutyTime: 60, DutyTime: 15},
+			{CharacterID: 2, Name: "Bob", Earnings: 50, HistoricalDutyTime: 30}}}, initialTime)
+	if state.HistoricalGenerated != 150 || state.PeriodGenerated != 0 || state.HistoricalServiceMinutes != 105 ||
+		state.PeriodServiceMinutes != 0 {
 		t.Fatalf("initial totals = historical %d, period %d", state.HistoricalGenerated, state.PeriodGenerated)
 	}
 	state = service.aggregate(state, Snapshot{BusinessID: 1995, Name: "Market", Bank: 700,
-		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 130}}}, initialTime.AddDate(0, 0, 2))
-	if state.HistoricalGenerated != 180 || state.PeriodGenerated != 30 || state.Employees["2"].Active {
+		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 130, HistoricalDutyTime: 120}}}, initialTime.AddDate(0, 0, 2))
+	if state.HistoricalGenerated != 180 || state.PeriodGenerated != 30 || state.HistoricalServiceMinutes != 150 ||
+		state.PeriodServiceMinutes != 45 || state.Employees["2"].Active {
 		t.Fatalf("second aggregate = %#v", state)
 	}
 	state = service.aggregate(state, Snapshot{BusinessID: 1995, Name: "Market", Bank: 900,
-		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 150}}}, initialTime.AddDate(0, 0, 7))
+		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 150, HistoricalDutyTime: 180}}}, initialTime.AddDate(0, 0, 7))
 	if state.HistoricalGenerated != 200 || state.PeriodGenerated != 20 || len(state.Periods) != 1 || state.Periods[0].Generated != 30 {
 		t.Fatalf("cut aggregate = %#v", state)
+	}
+	if state.Periods[0].ServiceMinutes != 45 || state.PeriodServiceMinutes != 60 || state.HistoricalServiceMinutes != 210 {
+		t.Fatalf("service cut aggregate = %#v", state)
 	}
 }
 
@@ -48,6 +53,7 @@ func TestRenderEmployeesGroupsRanksByAuthorityAndAlignsColumns(t *testing.T) {
 		t.Fatalf("rank order is incorrect:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "Empleado") || !strings.Contains(rendered, "$5,000") ||
+		!strings.Contains(rendered, "H semana") ||
 		!strings.Contains(rendered, "```text") {
 		t.Fatalf("employee table is incomplete:\n%s", rendered)
 	}

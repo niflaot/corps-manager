@@ -1,43 +1,18 @@
 version: "3.8"
 
 services:
-  mt-discord-bot-migrations:
-    image: ${DISCORD_BOT_MIGRATIONS_IMAGE:-ghcr.io/pixelados-net/discord-bot-migrations:v1.2.0}
-    container_name: mt-discord-bot-migrations
-    restart: "no"
-    command:
-      - --changelog-file=database/changelog.xml
-      - --url=jdbc:postgresql://${DISCORD_BOT_POSTGRES_HOST:?DISCORD_BOT_POSTGRES_HOST is required}:${DISCORD_BOT_POSTGRES_PORT:-5432}/${DISCORD_BOT_POSTGRES_DATABASE:?DISCORD_BOT_POSTGRES_DATABASE is required}
-      - --username=${DISCORD_BOT_POSTGRES_USER:?DISCORD_BOT_POSTGRES_USER is required}
-      - --password=${DISCORD_BOT_POSTGRES_PASSWORD:?DISCORD_BOT_POSTGRES_PASSWORD is required}
-      - update
-    networks:
-      - fl-network
-
-  mt-discord-bot:
+  mt-discord-bot-source:
     image: ${DISCORD_BOT_GO_IMAGE:?DISCORD_BOT_GO_IMAGE is required}
-    container_name: mt-discord-bot
-    restart: unless-stopped
-    init: true
-    depends_on:
-      mt-discord-bot-migrations:
-        condition: service_completed_successfully
-    working_dir: /workspace/source
-    entrypoint:
-      - /bin/bash
-      - -c
+    container_name: mt-discord-bot-source
+    restart: "no"
+    working_dir: /workspace
+    entrypoint: ["/bin/bash", "-c"]
+    command:
       - |
           set -Eeuo pipefail
-
           : "$${DISCORD_BOT_REPOSITORY_URL:?DISCORD_BOT_REPOSITORY_URL is required}"
           : "$${DISCORD_BOT_GIT_REF:?DISCORD_BOT_GIT_REF is required}"
-
-          readonly workspace=/workspace
-          readonly source_directory="$${workspace}/source"
-          readonly binary_directory="$${workspace}/bin"
-          readonly binary_path="$${binary_directory}/discord-bot"
-          readonly temporary_binary="$${binary_path}.tmp"
-          readonly commit_state="$${binary_directory}/commit"
+          readonly source_directory=/workspace/source
 
           if [[ ! -d "$${source_directory}/.git" ]]; then
             if [[ -e "$${source_directory}" ]] && [[ -n "$$(find "$${source_directory}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
@@ -49,19 +24,15 @@ services:
 
           current_origin="$$(git -C "$${source_directory}" remote get-url origin)"
           if [[ "$${current_origin}" != "$${DISCORD_BOT_REPOSITORY_URL}" ]]; then
-            echo "Refusing to update $${source_directory}: its origin does not match DISCORD_BOT_REPOSITORY_URL." >&2
-            exit 1
+            git -C "$${source_directory}" remote set-url origin "$${DISCORD_BOT_REPOSITORY_URL}"
+            echo "Updated source origin from $${current_origin} to $${DISCORD_BOT_REPOSITORY_URL}."
           fi
 
           git -C "$${source_directory}" fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
-
           resolved_commit=""
           for candidate in "refs/remotes/origin/$${DISCORD_BOT_GIT_REF}" "refs/tags/$${DISCORD_BOT_GIT_REF}" "$${DISCORD_BOT_GIT_REF}"; do
-            if resolved_commit="$$(git -C "$${source_directory}" rev-parse --verify "$${candidate}^{commit}" 2>/dev/null)"; then
-              break
-            fi
+            if resolved_commit="$$(git -C "$${source_directory}" rev-parse --verify "$${candidate}^{commit}" 2>/dev/null)"; then break; fi
           done
-
           if [[ -z "$${resolved_commit}" ]]; then
             echo "DISCORD_BOT_GIT_REF '$${DISCORD_BOT_GIT_REF}' does not resolve to a branch, tag, or commit." >&2
             exit 1
@@ -69,10 +40,61 @@ services:
 
           git -C "$${source_directory}" checkout --detach --force "$${resolved_commit}"
           git -C "$${source_directory}" clean -ffd
+          printf '%s' "$${resolved_commit}" > /workspace/resolved-commit
+          echo "Prepared discord-bot source at $${resolved_commit}."
+    volumes:
+      - mt-discord-bot-workspace:/workspace
+    environment:
+      DISCORD_BOT_REPOSITORY_URL: "${DISCORD_BOT_REPOSITORY_URL:-https://github.com/niflaot/corps-manager.git}"
+      DISCORD_BOT_GIT_REF: "${DISCORD_BOT_GIT_REF:?DISCORD_BOT_GIT_REF is required}"
+      GIT_TERMINAL_PROMPT: "0"
+
+  mt-discord-bot-migrations:
+    image: ${DISCORD_BOT_LIQUIBASE_IMAGE:-liquibase/liquibase:4.31}
+    container_name: mt-discord-bot-migrations
+    restart: "no"
+    depends_on:
+      mt-discord-bot-source:
+        condition: service_completed_successfully
+    working_dir: /workspace/source
+    command:
+      - --changelog-file=database/changelog.xml
+      - --url=jdbc:postgresql://${DISCORD_BOT_POSTGRES_HOST:?DISCORD_BOT_POSTGRES_HOST is required}:${DISCORD_BOT_POSTGRES_PORT:-5432}/${DISCORD_BOT_POSTGRES_DATABASE:?DISCORD_BOT_POSTGRES_DATABASE is required}
+      - --username=${DISCORD_BOT_POSTGRES_USER:?DISCORD_BOT_POSTGRES_USER is required}
+      - --password=${DISCORD_BOT_POSTGRES_PASSWORD:?DISCORD_BOT_POSTGRES_PASSWORD is required}
+      - update
+    volumes:
+      - mt-discord-bot-workspace:/workspace:ro
+    networks: [fl-network]
+
+  mt-discord-bot:
+    image: ${DISCORD_BOT_GO_IMAGE:?DISCORD_BOT_GO_IMAGE is required}
+    container_name: mt-discord-bot
+    restart: unless-stopped
+    init: true
+    depends_on:
+      mt-discord-bot-migrations:
+        condition: service_completed_successfully
+    working_dir: /workspace/source
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+          set -Eeuo pipefail
+          readonly source_directory=/workspace/source
+          readonly binary_directory=/workspace/bin
+          readonly binary_path="$${binary_directory}/discord-bot"
+          readonly temporary_binary="$${binary_path}.tmp"
+          readonly commit_state="$${binary_directory}/commit"
+          readonly resolved_commit="$$(cat /workspace/resolved-commit)"
+
+          actual_commit="$$(git -C "$${source_directory}" rev-parse HEAD)"
+          if [[ "$${actual_commit}" != "$${resolved_commit}" ]]; then
+            echo "Source commit $${actual_commit} does not match prepared commit $${resolved_commit}." >&2
+            exit 1
+          fi
 
           mkdir -p "$${binary_directory}"
           trap 'rm -f "$${temporary_binary}"' EXIT
-
           if [[ ! -x "$${binary_path}" || "$$(cat "$${commit_state}" 2>/dev/null || true)" != "$${resolved_commit}" ]]; then
             go mod download
             CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$${resolved_commit}" -o "$${temporary_binary}" ./cmd
@@ -82,16 +104,11 @@ services:
           else
             echo "Reusing discord-bot built from $${resolved_commit}."
           fi
-
           exec "$${binary_path}"
     volumes:
       - mt-discord-bot-workspace:/workspace
     environment:
-      DISCORD_BOT_REPOSITORY_URL: "${DISCORD_BOT_REPOSITORY_URL:?DISCORD_BOT_REPOSITORY_URL is required}"
-      DISCORD_BOT_GIT_REF: "${DISCORD_BOT_GIT_REF:?DISCORD_BOT_GIT_REF is required}"
-      GIT_TERMINAL_PROMPT: "0"
       GOTOOLCHAIN: local
-
       DISCORD_BOT_ENVIRONMENT: production
       DISCORD_BOT_HOST: 0.0.0.0
       DISCORD_BOT_PORT: "3100"
@@ -116,6 +133,11 @@ services:
       DISCORD_BOT_PERFORMANCE_MAX_RESPONSE_BYTES: "${DISCORD_BOT_PERFORMANCE_MAX_RESPONSE_BYTES:-2097152}"
       DISCORD_BOT_PERFORMANCE_HISTORY_LIMIT: "${DISCORD_BOT_PERFORMANCE_HISTORY_LIMIT:-104}"
 
+      DISCORD_BOT_INACTIVITY_ENABLED: "${DISCORD_BOT_INACTIVITY_ENABLED:-true}"
+      DISCORD_BOT_INACTIVITY_CHANNEL_ID: "${DISCORD_BOT_INACTIVITY_CHANNEL_ID:-}"
+      DISCORD_BOT_INACTIVITY_MESSAGE_KEY: "${DISCORD_BOT_INACTIVITY_MESSAGE_KEY:-inactivity-dismissals}"
+      DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL: "${DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL:-6h}"
+
       DISCORD_BOT_POSTGRES_HOST: "${DISCORD_BOT_POSTGRES_HOST:?DISCORD_BOT_POSTGRES_HOST is required}"
       DISCORD_BOT_POSTGRES_PORT: "${DISCORD_BOT_POSTGRES_PORT:-5432}"
       DISCORD_BOT_POSTGRES_DATABASE: "${DISCORD_BOT_POSTGRES_DATABASE:?DISCORD_BOT_POSTGRES_DATABASE is required}"
@@ -127,8 +149,7 @@ services:
       DISCORD_BOT_POSTGRES_CONNECT_TIMEOUT: "${DISCORD_BOT_POSTGRES_CONNECT_TIMEOUT:-5s}"
       DISCORD_BOT_POSTGRES_STATEMENT_TIMEOUT: "${DISCORD_BOT_POSTGRES_STATEMENT_TIMEOUT:-5s}"
       DISCORD_BOT_POSTGRES_HEALTH_TIMEOUT: "${DISCORD_BOT_POSTGRES_HEALTH_TIMEOUT:-2s}"
-    networks:
-      - fl-network
+    networks: [fl-network]
 
 volumes:
   mt-discord-bot-workspace:

@@ -5,7 +5,5 @@
     xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <include file="../internal/messages/postgres/changelog.xml" relativeToChangelogFile="true"/>
-    <include file="../internal/performance/postgres/changelog.xml" relativeToChangelogFile="true"/>
-    <include file="../internal/inactivity/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="migrations/0001_create_inactivity_dismissals.sql" relativeToChangelogFile="true"/>
 </databaseChangeLog>

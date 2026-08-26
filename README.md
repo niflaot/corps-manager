@@ -1,6 +1,6 @@
-# discord-bot v1.2.0
+# corps-manager v1.3.0
 
-Bot de Discord en Go para mantener mensajes editables y publicar el rendimiento de un negocio de SARP. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
+Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar expulsiones por inactividad. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
 
 El dashboard es un mensaje administrado con Components V2. Su definición y el ID remoto quedan en PostgreSQL: cada actualización edita el mismo mensaje y el reconciliador lo restaura si fue alterado o eliminado.
 
@@ -31,6 +31,11 @@ DISCORD_BOT_PERFORMANCE_CHANNEL_ID=123456789012345678
 DISCORD_BOT_PERFORMANCE_INTERVAL=6h
 DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY=Tuesday
 DISCORD_BOT_PERFORMANCE_TIMEZONE=America/Bogota
+
+DISCORD_BOT_INACTIVITY_ENABLED=true
+DISCORD_BOT_INACTIVITY_CHANNEL_ID=123456789012345678
+DISCORD_BOT_INACTIVITY_MESSAGE_KEY=inactivity-dismissals
+DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
 ```
 
 `DISCORD_BOT_PERFORMANCE_ENDPOINT` debe apuntar al `POST /api/query` de `sarp-scrapper`. El bot envía esta consulta, por lo que el token real de SARP permanece únicamente en `sarp-scrapper`:
@@ -41,11 +46,15 @@ DISCORD_BOT_PERFORMANCE_TIMEZONE=America/Bogota
 
 `DISCORD_BOT_PERFORMANCE_ENDPOINT_TOKEN` es opcional y sirve sólo si el túnel o reverse proxy protege ese endpoint con Bearer. No es el token de la API de SARP.
 
-## Cálculo de ganancias
+## Cortes de ganancias y servicio
 
-Al iniciar, el bot consulta inmediatamente y luego repite cada seis horas. El primer muestreo registra los valores actuales como histórico y establece la línea base semanal en cero. Los siguientes muestreos suman únicamente incrementos positivos del contador `earnings`; una reducción o reinicio del contador cambia la línea base sin restar del histórico.
+Al iniciar, el bot consulta inmediatamente y luego repite cada seis horas. El primer muestreo registra los valores actuales como histórico y establece la línea base semanal en cero. Los siguientes muestreos suman únicamente incrementos positivos de `earnings` y del contador de servicio `historical_duty_time + duty_time`; una reducción o reinicio cambia la línea base sin restar del histórico.
 
-Cada martes a las 00:00 en `America/Bogota` comienza un periodo nuevo. El corte anterior queda almacenado en PostgreSQL, incluyendo el total y el desglose por personaje. Se conservan 104 cortes por defecto. Los empleados que ya no aparecen quedan en el histórico, pero se marcan como inactivos.
+Cada martes a las 00:00 en `America/Bogota` comienza un periodo nuevo. El corte anterior queda almacenado en PostgreSQL con dinero y minutos de servicio, tanto totales como desglosados por personaje. Se conservan 104 cortes por defecto. Los empleados que ya no aparecen quedan en el histórico, pero se marcan como inactivos.
+
+## Registro de inactividad
+
+El bot publica un segundo mensaje administrado en `DISCORD_BOT_INACTIVITY_CHANNEL_ID`. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`. Sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mismo mensaje se edita después de cada cambio.
 
 ## Base de datos
 
@@ -57,7 +66,7 @@ liquibase --defaults-file=database/liquibase.properties validate
 liquibase --defaults-file=database/liquibase.properties update
 ```
 
-Los changelogs de dominio están en `internal/messages/postgres/` e `internal/performance/postgres/`. La aplicación no modifica el esquema durante el arranque.
+Los changelogs de dominio están en `internal/messages/postgres/`, `internal/performance/postgres/` e `internal/inactivity/postgres/`. La aplicación no modifica el esquema durante el arranque.
 
 ## Ejecutar
 
@@ -74,6 +83,9 @@ Rutas protegidas con `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
 
 - `GET /api/performance`: estado persistido, totales, empleados y cortes.
 - `POST /api/performance/refresh`: fuerza una consulta y actualiza el dashboard.
+- `GET /api/inactivity`: consulta el registro de expulsados.
+- `POST /api/inactivity` con `{"name":"Nombre_Apellido"}`: añade un empleado.
+- `DELETE /api/inactivity/Nombre_Apellido`: retira un empleado.
 - `/api/messages`: administración genérica de mensajes editables.
 
 Ejemplo de actualización manual:
@@ -87,6 +99,7 @@ curl -X POST http://127.0.0.1:3100/api/performance/refresh \
 
 - `internal/messages/`: mensajes durables y reconciliación con Discord.
 - `internal/performance/`: periodos, deltas, histórico y dashboard.
+- `internal/inactivity/`: registro durable, formulario y segundo mensaje.
 - `platform/sarp/`: cliente del endpoint configurable de `sarp-scrapper`.
 - `platform/httpapi/`: API Fiber y contrato OpenAPI/Scalar.
 - `platform/discord/`: sesión DiscordGo y gateway de mensajes.

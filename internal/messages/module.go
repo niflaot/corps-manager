@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/platform/clock"
+	"github.com/niflaot/corps-manager/internal/cronjob"
+	"github.com/niflaot/corps-manager/platform/clock"
 	"go.uber.org/fx"
 )
 

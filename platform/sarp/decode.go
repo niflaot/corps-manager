@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pixelados-net/discord-bot/internal/performance"
+	"github.com/niflaot/corps-manager/internal/performance"
 )
 
 type rawBusiness struct {

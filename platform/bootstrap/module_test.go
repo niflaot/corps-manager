@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"testing"
 
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"go.uber.org/fx"
 )
 

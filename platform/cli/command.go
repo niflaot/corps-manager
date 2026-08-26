@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	appconfig "github.com/pixelados-net/discord-bot/platform/app"
-	"github.com/pixelados-net/discord-bot/platform/bootstrap"
+	appconfig "github.com/niflaot/corps-manager/platform/app"
+	"github.com/niflaot/corps-manager/platform/bootstrap"
 )
 
 // Execute runs the discord-bot command with explicit process dependencies.

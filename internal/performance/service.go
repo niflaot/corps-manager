@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/platform/clock"
+	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/platform/clock"
 	"go.uber.org/zap"
 )
 
@@ -110,13 +110,24 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 			employee.HistoricalGenerated += delta
 			employee.PeriodGenerated += delta
 		}
+		serviceCounter := max(observed.HistoricalDutyTime, 0) + max(observed.DutyTime, 0)
+		if !employee.ServiceInitialized {
+			employee.HistoricalServiceMinutes = serviceCounter
+			employee.ServiceInitialized = true
+		} else if serviceCounter > employee.ServiceBaseline {
+			delta := serviceCounter - employee.ServiceBaseline
+			employee.HistoricalServiceMinutes += delta
+			employee.PeriodServiceMinutes += delta
+		}
 		employee.EmployeeSnapshot = observed
 		employee.Baseline = observed.Earnings
+		employee.ServiceBaseline = serviceCounter
 		employee.Active = true
 		employee.LastSeenAt = now
 		state.Employees[key] = employee
 	}
-	state.HistoricalGenerated, state.PeriodGenerated = totals(state.Employees)
+	state.HistoricalGenerated, state.PeriodGenerated, state.HistoricalServiceMinutes,
+		state.PeriodServiceMinutes = totals(state.Employees)
 	state.Initialized = true
 	state.LastCollectedAt = now
 	return state
@@ -124,30 +135,39 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 
 func (state *State) archive(boundary time.Time, limit int) {
 	employees := make(map[string]int64)
+	employeeServiceMinutes := make(map[string]int64)
 	for key, employee := range state.Employees {
 		if employee.PeriodGenerated > 0 {
 			employees[key] = employee.PeriodGenerated
 		}
+		if employee.PeriodServiceMinutes > 0 {
+			employeeServiceMinutes[key] = employee.PeriodServiceMinutes
+		}
 		employee.PeriodGenerated = 0
+		employee.PeriodServiceMinutes = 0
 		state.Employees[key] = employee
 	}
 	completed := Period{StartedAt: state.PeriodStartedAt, EndedAt: boundary,
-		Generated: state.PeriodGenerated, Employees: employees}
+		Generated: state.PeriodGenerated, ServiceMinutes: state.PeriodServiceMinutes,
+		Employees: employees, EmployeeServiceMinutes: employeeServiceMinutes}
 	state.Periods = append([]Period{completed}, state.Periods...)
 	if len(state.Periods) > limit {
 		state.Periods = state.Periods[:limit]
 	}
 	state.PeriodGenerated = 0
+	state.PeriodServiceMinutes = 0
 	state.PeriodStartedAt = boundary
 }
 
-func totals(employees map[string]EmployeeState) (int64, int64) {
-	var historical, period int64
+func totals(employees map[string]EmployeeState) (int64, int64, int64, int64) {
+	var historical, period, historicalService, periodService int64
 	for _, employee := range employees {
 		historical += employee.HistoricalGenerated
 		period += employee.PeriodGenerated
+		historicalService += employee.HistoricalServiceMinutes
+		periodService += employee.PeriodServiceMinutes
 	}
-	return historical, period
+	return historical, period, historicalService, periodService
 }
 
 func periodBoundary(now time.Time, weekday time.Weekday) time.Time {

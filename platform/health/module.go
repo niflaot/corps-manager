@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/platform/discord"
-	"github.com/pixelados-net/discord-bot/platform/postgres"
+	"github.com/niflaot/corps-manager/internal/cronjob"
+	"github.com/niflaot/corps-manager/platform/discord"
+	"github.com/niflaot/corps-manager/platform/postgres"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )

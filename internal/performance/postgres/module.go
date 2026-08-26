@@ -1,8 +1,8 @@
 package postgres
 
 import (
-	"github.com/pixelados-net/discord-bot/internal/performance"
-	platformpostgres "github.com/pixelados-net/discord-bot/platform/postgres"
+	"github.com/niflaot/corps-manager/internal/performance"
+	platformpostgres "github.com/niflaot/corps-manager/platform/postgres"
 	"go.uber.org/fx"
 )
 

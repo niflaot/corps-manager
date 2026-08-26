@@ -56,10 +56,18 @@ type EmployeeState struct {
 	EmployeeSnapshot
 	// Baseline is the most recently observed upstream earnings counter.
 	Baseline int64 `json:"baseline"`
+	// ServiceBaseline is the most recently observed total service-minute counter.
+	ServiceBaseline int64 `json:"serviceBaseline"`
+	// ServiceInitialized reports whether the service baseline has been captured.
+	ServiceInitialized bool `json:"serviceInitialized"`
 	// HistoricalGenerated is the total observed for this employee.
 	HistoricalGenerated int64 `json:"historicalGenerated"`
 	// PeriodGenerated is the total observed in the active period.
 	PeriodGenerated int64 `json:"periodGenerated"`
+	// HistoricalServiceMinutes is the total observed service time for this employee.
+	HistoricalServiceMinutes int64 `json:"historicalServiceMinutes"`
+	// PeriodServiceMinutes is the observed service time in the active period.
+	PeriodServiceMinutes int64 `json:"periodServiceMinutes"`
 	// Active reports whether the employee appeared in the latest snapshot.
 	Active bool `json:"active"`
 	// LastSeenAt is the last snapshot containing this employee.
@@ -74,8 +82,12 @@ type Period struct {
 	EndedAt time.Time `json:"endedAt"`
 	// Generated is the business total accumulated in the period.
 	Generated int64 `json:"generated"`
+	// ServiceMinutes is the business service time accumulated in the period.
+	ServiceMinutes int64 `json:"serviceMinutes"`
 	// Employees maps character IDs to their period totals.
 	Employees map[string]int64 `json:"employees"`
+	// EmployeeServiceMinutes maps character IDs to their period service time.
+	EmployeeServiceMinutes map[string]int64 `json:"employeeServiceMinutes"`
 }
 
 // State is the persisted business performance aggregate.
@@ -90,6 +102,10 @@ type State struct {
 	HistoricalGenerated int64 `json:"historicalGenerated"`
 	// PeriodGenerated is the active weekly total.
 	PeriodGenerated int64 `json:"periodGenerated"`
+	// HistoricalServiceMinutes is the tracked all-time service total.
+	HistoricalServiceMinutes int64 `json:"historicalServiceMinutes"`
+	// PeriodServiceMinutes is the service total in the active weekly period.
+	PeriodServiceMinutes int64 `json:"periodServiceMinutes"`
 	// PeriodStartedAt is the active weekly boundary.
 	PeriodStartedAt time.Time `json:"periodStartedAt"`
 	// Employees contains current and former employee aggregates.

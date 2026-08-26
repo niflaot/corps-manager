@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/pixelados-net/discord-bot/internal/cronjob"
-	"github.com/pixelados-net/discord-bot/internal/messages"
-	"github.com/pixelados-net/discord-bot/platform/clock"
+	"github.com/niflaot/corps-manager/internal/cronjob"
+	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/platform/clock"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
