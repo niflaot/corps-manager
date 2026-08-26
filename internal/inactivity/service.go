@@ -82,14 +82,29 @@ func (service *Service) Publish(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := service.publishDefinition(ctx, definition); err != nil {
+		return err
+	}
+	if service.config.AnnouncementChannelID == "" {
+		return nil
+	}
+	control, err := RenderOpeningControl(service.config, service.guildID)
+	if err != nil {
+		return err
+	}
+	return service.publishDefinition(ctx, control)
+}
+
+func (service *Service) publishDefinition(ctx context.Context, definition messages.Definition) error {
 	payloadKey, err := definitionFingerprint(definition)
 	if err != nil {
 		return err
 	}
 	for attempt := 0; attempt < publishAttempts; attempt++ {
-		record, getErr := service.messages.Get(ctx, service.config.MessageKey)
+		record, getErr := service.messages.Get(ctx, definition.Key)
 		if errors.Is(getErr, messages.ErrNotFound) {
-			_, createErr := service.messages.Create(ctx, definition, "inactivity-create-"+payloadKey)
+			key := fmt.Sprintf("dashboard-create-%s-%s", definition.Key, payloadKey)
+			_, createErr := service.messages.Create(ctx, definition, key)
 			if errors.Is(createErr, messages.ErrConflict) {
 				continue
 			}
@@ -98,8 +113,8 @@ func (service *Service) Publish(ctx context.Context) error {
 		if getErr != nil {
 			return getErr
 		}
-		_, replaceErr := service.messages.Replace(ctx, record.Key, record.Revision, definition,
-			fmt.Sprintf("inactivity-replace-%d-%s", record.Revision, payloadKey))
+		key := fmt.Sprintf("dashboard-replace-%s-%d-%s", definition.Key, record.Revision, payloadKey)
+		_, replaceErr := service.messages.Replace(ctx, record.Key, record.Revision, definition, key)
 		if errors.Is(replaceErr, messages.ErrConflict) {
 			continue
 		}

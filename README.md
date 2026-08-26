@@ -37,6 +37,7 @@ DISCORD_BOT_INACTIVITY_CHANNEL_ID=123456789012345678
 DISCORD_BOT_INACTIVITY_MESSAGE_KEY=inactivity-dismissals
 DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=987654321098765432
+DISCORD_BOT_ANNOUNCEMENT_MESSAGE_KEY=business-opening-control
 DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
 ```
 
@@ -60,7 +61,7 @@ Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.
 
 El bot publica un segundo mensaje administrado en `DISCORD_BOT_INACTIVITY_CHANNEL_ID`. **Ver inactivos** abre una lista efímera y paginada de 20 registros que sólo ve quien la consulta, sin publicar mensajes adicionales en el canal. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`; sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mensaje público muestra únicamente su total.
 
-Si `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` está configurado, el mismo panel muestra **Accionar apertura**. Un administrador del registro puede publicar en ese canal un embed de apertura de Benny's Motor, mencionar a `@everyone` y dejar en el footer el nombre visible de quien pulsó el botón. En el canal de anuncios, el bot necesita además `Embed Links` y `Mention Everyone`.
+Si `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` está configurado, el bot publica un segundo panel administrado en `DISCORD_BOT_INACTIVITY_CHANNEL_ID` con **Accionar apertura**. El panel de empleados y el control de apertura son mensajes separados en el mismo canal. Un administrador del registro puede publicar en el canal de anuncios un embed de apertura de Benny's Motor, mencionar a `@everyone` y dejar en el footer el nombre visible de quien pulsó el botón. En el canal de anuncios, el bot necesita además `Embed Links` y `Mention Everyone`.
 
 El botón y la API comparten un cooldown persistente de `DISCORD_BOT_ANNOUNCEMENT_COOLDOWN` (30 minutos por defecto). La adquisición es atómica, sobrevive reinicios y evita anuncios duplicados por pulsaciones simultáneas. Si Discord rechaza la publicación, el cooldown se libera automáticamente.
 

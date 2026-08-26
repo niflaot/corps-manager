@@ -25,6 +25,8 @@ type Config struct {
 	MessageKey string `env:"DISCORD_BOT_INACTIVITY_MESSAGE_KEY" envDefault:"inactivity-dismissals"`
 	// AnnouncementChannelID receives public business-opening announcements.
 	AnnouncementChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID"`
+	// AnnouncementMessageKey identifies the separate opening-control message.
+	AnnouncementMessageKey string `env:"DISCORD_BOT_ANNOUNCEMENT_MESSAGE_KEY" envDefault:"business-opening-control"`
 	// RefreshInterval controls periodic dashboard reconciliation.
 	RefreshInterval time.Duration `env:"DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL" envDefault:"6h"`
 }
@@ -41,6 +43,7 @@ func LoadConfig() (Config, error) {
 	}
 	config.MessageKey = strings.TrimSpace(config.MessageKey)
 	config.AnnouncementChannelID = strings.TrimSpace(config.AnnouncementChannelID)
+	config.AnnouncementMessageKey = strings.TrimSpace(config.AnnouncementMessageKey)
 	if config.RefreshInterval <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL must be positive")
 	}
@@ -55,6 +58,9 @@ func LoadConfig() (Config, error) {
 	}
 	if config.AnnouncementChannelID != "" && !discordSnowflakePattern.MatchString(config.AnnouncementChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
+	}
+	if config.AnnouncementChannelID != "" && !messageKeyPattern.MatchString(config.AnnouncementMessageKey) {
+		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_MESSAGE_KEY is invalid")
 	}
 	return config, nil
 }

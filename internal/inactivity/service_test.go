@@ -13,7 +13,8 @@ func TestLoadConfigDefaultsToPerformanceChannel(t *testing.T) {
 	t.Setenv("DISCORD_BOT_PERFORMANCE_CHANNEL_ID", "456")
 	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID", "789")
 	config, err := LoadConfig()
-	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" {
+	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" ||
+		config.AnnouncementMessageKey != "business-opening-control" {
 		t.Fatalf("LoadConfig() = %#v, %v", config, err)
 	}
 }
@@ -44,36 +45,52 @@ func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := string(encoded)
-	for _, expected := range []string{ButtonListCustomID, ButtonAddCustomID, ButtonRemoveCustomID, ButtonOpeningCustomID} {
+	for _, expected := range []string{ButtonListCustomID, ButtonAddCustomID, ButtonRemoveCustomID} {
 		if !strings.Contains(payload, expected) {
 			t.Fatalf("rendered payload does not contain %q: %s", expected, payload)
 		}
+	}
+	if strings.Contains(payload, ButtonOpeningCustomID) {
+		t.Fatalf("employee dashboard contains opening control: %s", payload)
 	}
 	if strings.Contains(payload, "Thomas_Jhonson") {
 		t.Fatalf("public dashboard exposes inactivity entries: %s", payload)
 	}
 }
 
-func TestDashboardFingerprintChangesWithOpeningButton(t *testing.T) {
-	base := Config{ChannelID: "456", MessageKey: "inactivity-dismissals"}
-	withoutButton, err := Render(nil, base, "123")
+func TestRenderOpeningControlProducesSeparateManagedMessage(t *testing.T) {
+	config := Config{ChannelID: "456", AnnouncementMessageKey: "business-opening-control"}
+	definition, err := RenderOpeningControl(config, "123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	base.AnnouncementChannelID = "789"
-	withButton, err := Render(nil, base, "123")
+	if definition.Key != "business-opening-control" || definition.ChannelID != "456" {
+		t.Fatalf("opening definition = %#v", definition)
+	}
+	encoded, err := json.Marshal(definition.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	withoutFingerprint, err := definitionFingerprint(withoutButton)
+	if !strings.Contains(string(encoded), ButtonOpeningCustomID) {
+		t.Fatalf("opening payload does not contain button: %s", encoded)
+	}
+}
+
+func TestDashboardFingerprintIncludesAssignment(t *testing.T) {
+	definition, err := Render(nil, Config{ChannelID: "456", MessageKey: "inactivity-dismissals"}, "123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	withFingerprint, err := definitionFingerprint(withButton)
+	before, err := definitionFingerprint(definition)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if withoutFingerprint == withFingerprint {
-		t.Fatalf("opening button did not change fingerprint: %s", withFingerprint)
+	definition.ChannelID = "789"
+	after, err := definitionFingerprint(definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Fatalf("assignment did not change fingerprint: %s", after)
 	}
 }
