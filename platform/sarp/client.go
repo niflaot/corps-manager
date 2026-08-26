@@ -30,38 +30,9 @@ func NewClient(config performance.Config) *Client {
 
 // Fetch reads one current business snapshot.
 func (client *Client) Fetch(ctx context.Context, businessID int64) (performance.Snapshot, error) {
-	requestBody := struct {
-		Provider string `json:"provider"`
-		Path     string `json:"path"`
-	}{Provider: "gta-rol", Path: fmt.Sprintf("/businesses/%d", businessID)}
-	encoded, err := json.Marshal(requestBody)
+	body, err := client.query(ctx, fmt.Sprintf("/businesses/%d", businessID))
 	if err != nil {
 		return performance.Snapshot{}, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, client.config.Endpoint, bytes.NewReader(encoded))
-	if err != nil {
-		return performance.Snapshot{}, fmt.Errorf("create SARP request: %w", err)
-	}
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", userAgent)
-	if client.config.EndpointToken != "" {
-		request.Header.Set("Authorization", "Bearer "+client.config.EndpointToken)
-	}
-	response, err := client.http.Do(request)
-	if err != nil {
-		return performance.Snapshot{}, fmt.Errorf("call SARP endpoint: %w", err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, client.config.MaxResponseBytes+1))
-	if err != nil {
-		return performance.Snapshot{}, fmt.Errorf("read SARP response: %w", err)
-	}
-	if int64(len(body)) > client.config.MaxResponseBytes {
-		return performance.Snapshot{}, fmt.Errorf("SARP response exceeds configured limit")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return performance.Snapshot{}, fmt.Errorf("SARP endpoint returned HTTP %d: %s", response.StatusCode, responseMessage(body))
 	}
 	snapshot, err := decodeSnapshot(body)
 	if err != nil {
@@ -73,7 +44,52 @@ func (client *Client) Fetch(ctx context.Context, businessID int64) (performance.
 	if snapshot.BusinessID != businessID {
 		return performance.Snapshot{}, fmt.Errorf("SARP returned business %d, expected %d", snapshot.BusinessID, businessID)
 	}
+	ranksBody, err := client.query(ctx, fmt.Sprintf("/businesses/%d/ranks", businessID))
+	if err != nil {
+		return performance.Snapshot{}, fmt.Errorf("fetch SARP ranks: %w", err)
+	}
+	snapshot.Ranks, err = decodeRanks(ranksBody)
+	if err != nil {
+		return performance.Snapshot{}, err
+	}
 	return snapshot, nil
+}
+
+func (client *Client) query(ctx context.Context, path string) ([]byte, error) {
+	requestBody := struct {
+		Provider string `json:"provider"`
+		Path     string `json:"path"`
+	}{Provider: "gta-rol", Path: path}
+	encoded, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, client.config.Endpoint, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("create SARP request: %w", err)
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", userAgent)
+	if client.config.EndpointToken != "" {
+		request.Header.Set("Authorization", "Bearer "+client.config.EndpointToken)
+	}
+	response, err := client.http.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("call SARP endpoint: %w", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, client.config.MaxResponseBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read SARP response: %w", err)
+	}
+	if int64(len(body)) > client.config.MaxResponseBytes {
+		return nil, fmt.Errorf("SARP response exceeds configured limit")
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("SARP endpoint returned HTTP %d: %s", response.StatusCode, responseMessage(body))
+	}
+	return body, nil
 }
 
 type flexibleInt int64

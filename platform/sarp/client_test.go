@@ -20,11 +20,19 @@ func TestClientFetchQueriesGtaRolBusiness(t *testing.T) {
 			Provider string `json:"provider"`
 			Path     string `json:"path"`
 		}
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || body.Provider != "gta-rol" || body.Path != "/businesses/1995" {
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || body.Provider != "gta-rol" {
 			t.Errorf("request body = %#v, error = %v", body, err)
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`{"payload":{"id":1995,"name":"Benny","bank":10,"employees":[]}}`))
+		switch body.Path {
+		case "/businesses/1995":
+			_, _ = writer.Write([]byte(`{"payload":{"id":1995,"name":"Benny","bank":10,"employees":[]}}`))
+		case "/businesses/1995/ranks":
+			_, _ = writer.Write([]byte(`{"payload":[{"id":7,"name":"Manager","permissions":255,"paycheck":500}]}`))
+		default:
+			t.Errorf("unexpected path %q", body.Path)
+			writer.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 	client := NewClient(performance.Config{Endpoint: server.URL, EndpointToken: "tunnel-token",
@@ -33,7 +41,8 @@ func TestClientFetchQueriesGtaRolBusiness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fetch() error = %v", err)
 	}
-	if snapshot.BusinessID != 1995 || snapshot.Name != "Benny" || snapshot.Bank != 10 {
+	if snapshot.BusinessID != 1995 || snapshot.Name != "Benny" || snapshot.Bank != 10 ||
+		len(snapshot.Ranks) != 1 || snapshot.Ranks[0].Permissions != 255 {
 		t.Fatalf("Fetch() = %#v", snapshot)
 	}
 }

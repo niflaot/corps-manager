@@ -95,6 +95,7 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 		}
 	}
 	state.Name, state.Bank = snapshot.Name, snapshot.Bank
+	state.Ranks = snapshot.Ranks
 	for key, employee := range state.Employees {
 		employee.Active = false
 		state.Employees[key] = employee

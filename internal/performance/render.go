@@ -3,6 +3,7 @@ package performance
 import (
 	"encoding/json"
 	"fmt"
+	"math/bits"
 	"sort"
 	"strings"
 	"time"
@@ -10,7 +11,12 @@ import (
 	"github.com/pixelados-net/discord-bot/internal/messages"
 )
 
-const dashboardAccent = 0x2ecc71
+const (
+	dashboardAccent       = 0x2ecc71
+	employeeColumnWidth   = 22
+	moneyColumnWidth      = 12
+	employeesContentLimit = 3000
+)
 
 type textDisplay struct {
 	Type    int    `json:"type"`
@@ -56,35 +62,125 @@ func Render(state State, config Config, guildID string) (messages.Definition, er
 }
 
 func renderEmployees(state State) string {
-	employees := make([]EmployeeState, 0, len(state.Employees))
-	for _, employee := range state.Employees {
-		if employee.Active {
-			employees = append(employees, employee)
-		}
+	ranksByID := make(map[int64]RankSnapshot, len(state.Ranks))
+	for _, rank := range state.Ranks {
+		ranksByID[rank.ID] = rank
 	}
-	sort.Slice(employees, func(i, j int) bool {
-		if employees[i].PeriodGenerated == employees[j].PeriodGenerated {
-			return employees[i].Name < employees[j].Name
+	groupsByKey := make(map[string]*employeeRankGroup)
+	for _, employee := range state.Employees {
+		if !employee.Active {
+			continue
 		}
-		return employees[i].PeriodGenerated > employees[j].PeriodGenerated
-	})
-	if len(employees) == 0 {
+		rank, known := ranksByID[employee.RankID]
+		if strings.TrimSpace(rank.Name) == "" {
+			rank = RankSnapshot{ID: employee.RankID, Name: strings.TrimSpace(employee.RankName)}
+		}
+		if rank.Name == "" {
+			rank.Name = "Sin rango"
+		}
+		key := fmt.Sprintf("id:%d", rank.ID)
+		if rank.ID == 0 {
+			key = "name:" + strings.ToLower(rank.Name)
+		}
+		group := groupsByKey[key]
+		if group == nil {
+			group = &employeeRankGroup{Rank: rank, Known: known}
+			groupsByKey[key] = group
+		}
+		group.Employees = append(group.Employees, employee)
+	}
+	if len(groupsByKey) == 0 {
 		return "## Empleados\nSin empleados en la respuesta actual."
 	}
-	lines := []string{"## Empleados", "`Semanal` · `Histórico`"}
-	for _, employee := range employees {
-		line := fmt.Sprintf("**%s** · %s · %s", escapeMarkdown(employee.Name),
-			money(employee.PeriodGenerated), money(employee.HistoricalGenerated))
-		if employee.RankName != "" {
-			line += " · " + escapeMarkdown(employee.RankName)
-		}
-		lines = append(lines, line)
-		if len(strings.Join(lines, "\n")) > 3000 {
-			lines = append(lines[:len(lines)-1], "_Lista truncada; consulta la API para ver el detalle completo._")
+	groups := make([]employeeRankGroup, 0, len(groupsByKey))
+	for _, group := range groupsByKey {
+		sort.Slice(group.Employees, func(i, j int) bool {
+			left, right := group.Employees[i], group.Employees[j]
+			if left.PeriodGenerated != right.PeriodGenerated {
+				return left.PeriodGenerated > right.PeriodGenerated
+			}
+			if left.HistoricalGenerated != right.HistoricalGenerated {
+				return left.HistoricalGenerated > right.HistoricalGenerated
+			}
+			return strings.ToLower(left.Name) < strings.ToLower(right.Name)
+		})
+		groups = append(groups, *group)
+	}
+	sort.Slice(groups, func(i, j int) bool { return higherRank(groups[i], groups[j]) })
+
+	var rendered strings.Builder
+	rendered.WriteString("## Empleados\n`Agrupados por rango · mayor autoridad primero`\n")
+	truncated := false
+groupsLoop:
+	for _, group := range groups {
+		prefix := fmt.Sprintf("### %s\n```text\n", escapeMarkdown(group.Rank.Name))
+		header := employeeTableHeader()
+		if rendered.Len()+len(prefix)+len(header)+len("```\n") > employeesContentLimit {
+			truncated = true
 			break
 		}
+		rendered.WriteString(prefix)
+		rendered.WriteString(header)
+		for _, employee := range group.Employees {
+			row := employeeTableRow(employee)
+			if rendered.Len()+len(row)+len("```\n")+64 > employeesContentLimit {
+				truncated = true
+				rendered.WriteString("```\n")
+				break groupsLoop
+			}
+			rendered.WriteString(row)
+		}
+		rendered.WriteString("```\n")
 	}
-	return strings.Join(lines, "\n")
+	if truncated {
+		rendered.WriteString("_Lista truncada; consulta la API para ver el detalle completo._")
+	}
+	return strings.TrimSpace(rendered.String())
+}
+
+type employeeRankGroup struct {
+	Rank      RankSnapshot
+	Known     bool
+	Employees []EmployeeState
+}
+
+func higherRank(left, right employeeRankGroup) bool {
+	if left.Known != right.Known {
+		return left.Known
+	}
+	leftPermissions := bits.OnesCount64(left.Rank.Permissions)
+	rightPermissions := bits.OnesCount64(right.Rank.Permissions)
+	if leftPermissions != rightPermissions {
+		return leftPermissions > rightPermissions
+	}
+	if left.Rank.Permissions != right.Rank.Permissions {
+		return left.Rank.Permissions > right.Rank.Permissions
+	}
+	if left.Rank.ID != right.Rank.ID {
+		return left.Rank.ID > right.Rank.ID
+	}
+	return strings.ToLower(left.Rank.Name) < strings.ToLower(right.Rank.Name)
+}
+
+func employeeTableHeader() string {
+	return fmt.Sprintf("%-*s %*s %*s\n%s %s %s\n", employeeColumnWidth, "Empleado", moneyColumnWidth,
+		"Semanal", moneyColumnWidth, "Histórico", strings.Repeat("-", employeeColumnWidth),
+		strings.Repeat("-", moneyColumnWidth), strings.Repeat("-", moneyColumnWidth))
+}
+
+func employeeTableRow(employee EmployeeState) string {
+	name := tableCell(employee.Name, employeeColumnWidth)
+	return fmt.Sprintf("%-*s %*s %*s\n", employeeColumnWidth, name, moneyColumnWidth,
+		money(employee.PeriodGenerated), moneyColumnWidth, money(employee.HistoricalGenerated))
+}
+
+func tableCell(value string, width int) string {
+	value = strings.NewReplacer("\r", " ", "\n", " ", "\t", " ", "`", "'").Replace(strings.TrimSpace(value))
+	runes := []rune(value)
+	if len(runes) <= width {
+		return value
+	}
+	return string(runes[:width-1]) + "…"
 }
 
 func renderPeriods(state State, config Config) string {

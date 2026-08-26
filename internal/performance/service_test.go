@@ -1,6 +1,7 @@
 package performance
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -27,6 +28,28 @@ func TestAggregateTracksDeltasAndTuesdayCut(t *testing.T) {
 		Employees: []EmployeeSnapshot{{CharacterID: 1, Name: "Alice", Earnings: 150}}}, initialTime.AddDate(0, 0, 7))
 	if state.HistoricalGenerated != 200 || state.PeriodGenerated != 20 || len(state.Periods) != 1 || state.Periods[0].Generated != 30 {
 		t.Fatalf("cut aggregate = %#v", state)
+	}
+}
+
+func TestRenderEmployeesGroupsRanksByAuthorityAndAlignsColumns(t *testing.T) {
+	state := State{Ranks: []RankSnapshot{
+		{ID: 142, Name: "Mechanic", Permissions: 3},
+		{ID: 903, Name: "Chief Executive Officer", Permissions: 255},
+	}, Employees: map[string]EmployeeState{
+		"1": {EmployeeSnapshot: EmployeeSnapshot{CharacterID: 1, RankID: 142, Name: "Mechanic_Name"},
+			HistoricalGenerated: 1200, Active: true},
+		"2": {EmployeeSnapshot: EmployeeSnapshot{CharacterID: 2, RankID: 903, Name: "Executive_Name"},
+			HistoricalGenerated: 250000, PeriodGenerated: 5000, Active: true},
+	}}
+	rendered := renderEmployees(state)
+	executiveIndex := strings.Index(rendered, "Chief Executive Officer")
+	mechanicIndex := strings.Index(rendered, "### Mechanic")
+	if executiveIndex < 0 || mechanicIndex < 0 || executiveIndex >= mechanicIndex {
+		t.Fatalf("rank order is incorrect:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Empleado") || !strings.Contains(rendered, "$5,000") ||
+		!strings.Contains(rendered, "```text") {
+		t.Fatalf("employee table is incomplete:\n%s", rendered)
 	}
 }
 

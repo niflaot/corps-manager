@@ -7,6 +7,8 @@ import "time"
 type EmployeeSnapshot struct {
 	// CharacterID identifies the employee character.
 	CharacterID int64 `json:"characterId"`
+	// RankID identifies the employee's current business rank.
+	RankID int64 `json:"rankId,omitempty"`
 	// Name is the current character display name.
 	Name string `json:"name"`
 	// RankName is the current business rank.
@@ -23,6 +25,18 @@ type EmployeeSnapshot struct {
 	LastLogin string `json:"lastLogin,omitempty"`
 }
 
+// RankSnapshot describes one business rank returned by SARP.
+type RankSnapshot struct {
+	// ID identifies the rank.
+	ID int64 `json:"id"`
+	// Name is the rank display name.
+	Name string `json:"name"`
+	// Permissions is the upstream permission bitmask used for hierarchy ordering.
+	Permissions uint64 `json:"permissions"`
+	// Paycheck is the configured paycheck for the rank.
+	Paycheck int64 `json:"paycheck"`
+}
+
 // Snapshot is the current business projection returned by SARP.
 type Snapshot struct {
 	// BusinessID identifies the monitored business.
@@ -33,6 +47,8 @@ type Snapshot struct {
 	Bank int64 `json:"bank"`
 	// Employees contains current employee counters.
 	Employees []EmployeeSnapshot `json:"employees"`
+	// Ranks contains the current business rank definitions.
+	Ranks []RankSnapshot `json:"ranks"`
 }
 
 // EmployeeState stores durable earnings for one current or former employee.
@@ -78,6 +94,8 @@ type State struct {
 	PeriodStartedAt time.Time `json:"periodStartedAt"`
 	// Employees contains current and former employee aggregates.
 	Employees map[string]EmployeeState `json:"employees"`
+	// Ranks contains the latest business rank definitions.
+	Ranks []RankSnapshot `json:"ranks"`
 	// Periods contains completed cuts from newest to oldest.
 	Periods []Period `json:"periods"`
 	// Initialized reports whether a baseline has been captured.
