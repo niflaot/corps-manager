@@ -71,7 +71,8 @@ func RenderOpeningControl(config Config, guildID string) (messages.Definition, e
 	if err != nil {
 		return messages.Definition{}, fmt.Errorf("encode opening control: %w", err)
 	}
-	return messages.Definition{Key: openingMessageKey, GuildID: guildID, ChannelID: config.ChannelID,
+	return messages.Definition{Key: openingMessageKey, GuildID: guildID,
+		ChannelID: config.AnnouncementControlChannelID,
 		Payload: messages.Payload{Components: []messages.Component{encoded},
 			AllowedMentions: messages.AllowedMentions{Parse: []string{}}}}, nil
 }

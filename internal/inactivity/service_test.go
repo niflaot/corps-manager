@@ -11,8 +11,10 @@ func TestLoadConfigUsesPerformanceChannel(t *testing.T) {
 	t.Setenv("DISCORD_BOT_INACTIVITY_ENABLED", "true")
 	t.Setenv("DISCORD_BOT_PERFORMANCE_CHANNEL_ID", "456")
 	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID", "789")
+	t.Setenv("DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID", "987")
 	config, err := LoadConfig()
-	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" {
+	if err != nil || config.ChannelID != "456" || config.AnnouncementChannelID != "789" ||
+		config.AnnouncementControlChannelID != "987" {
 		t.Fatalf("LoadConfig() = %#v, %v", config, err)
 	}
 }
@@ -60,12 +62,12 @@ func TestRenderProducesInteractiveManagedMessage(t *testing.T) {
 }
 
 func TestRenderOpeningControlProducesSeparateManagedMessage(t *testing.T) {
-	config := Config{ChannelID: "456"}
+	config := Config{ChannelID: "456", AnnouncementControlChannelID: "987"}
 	definition, err := RenderOpeningControl(config, "123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if definition.Key != openingMessageKey || definition.ChannelID != "456" {
+	if definition.Key != openingMessageKey || definition.ChannelID != "987" {
 		t.Fatalf("opening definition = %#v", definition)
 	}
 	encoded, err := json.Marshal(definition.Payload)

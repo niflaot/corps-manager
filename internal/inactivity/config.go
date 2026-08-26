@@ -19,6 +19,8 @@ type Config struct {
 	ChannelID string `env:"DISCORD_BOT_PERFORMANCE_CHANNEL_ID"`
 	// AnnouncementChannelID receives public business-opening announcements.
 	AnnouncementChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID"`
+	// AnnouncementControlChannelID contains the separate opening-control message.
+	AnnouncementControlChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID"`
 	// RefreshInterval controls periodic dashboard reconciliation.
 	RefreshInterval time.Duration `env:"DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL" envDefault:"6h"`
 }
@@ -31,6 +33,7 @@ func LoadConfig() (Config, error) {
 	}
 	config.ChannelID = strings.TrimSpace(config.ChannelID)
 	config.AnnouncementChannelID = strings.TrimSpace(config.AnnouncementChannelID)
+	config.AnnouncementControlChannelID = strings.TrimSpace(config.AnnouncementControlChannelID)
 	if config.RefreshInterval <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL must be positive")
 	}
@@ -42,6 +45,9 @@ func LoadConfig() (Config, error) {
 	}
 	if !discordSnowflakePattern.MatchString(config.AnnouncementChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
+	}
+	if !discordSnowflakePattern.MatchString(config.AnnouncementControlChannelID) {
+		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID must be a Discord snowflake")
 	}
 	return config, nil
 }

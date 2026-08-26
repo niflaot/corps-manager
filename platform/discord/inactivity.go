@@ -39,11 +39,14 @@ func registerInactivityInteractions(lifecycle fx.Lifecycle, client *Client, serv
 }
 
 func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, event *discordgo.InteractionCreate) {
-	if !handler.config.Enabled || event.GuildID == "" || event.ChannelID != handler.config.ChannelID {
+	if !handler.config.Enabled || event.GuildID == "" {
 		return
 	}
 	customID := interactionCustomID(event)
 	if customID == "" {
+		return
+	}
+	if !handler.acceptsChannel(customID, event.ChannelID) {
 		return
 	}
 	if page, update, ok := inactivityListPage(customID); ok {
@@ -69,6 +72,13 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 	case inactivityAddModalID, inactivityRemoveModalID:
 		handler.submit(session, event, customID)
 	}
+}
+
+func (handler *inactivityInteractionHandler) acceptsChannel(customID string, channelID string) bool {
+	if customID == inactivity.ButtonOpeningCustomID {
+		return channelID == handler.config.AnnouncementControlChannelID
+	}
+	return channelID == handler.config.ChannelID
 }
 
 func (handler *inactivityInteractionHandler) openModal(session *discordgo.Session, interaction *discordgo.Interaction,

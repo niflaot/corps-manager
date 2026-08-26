@@ -115,6 +115,20 @@ func TestOpeningAnnouncementMentionsEveryoneAndAttributesActor(t *testing.T) {
 	}
 }
 
+func TestInactivityInteractionsUseSeparateControlChannel(t *testing.T) {
+	handler := &inactivityInteractionHandler{config: inactivity.Config{
+		ChannelID: "performance", AnnouncementControlChannelID: "opening-control",
+	}}
+	if !handler.acceptsChannel(inactivity.ButtonAddCustomID, "performance") ||
+		handler.acceptsChannel(inactivity.ButtonAddCustomID, "opening-control") {
+		t.Fatal("employee controls are not restricted to the performance channel")
+	}
+	if !handler.acceptsChannel(inactivity.ButtonOpeningCustomID, "opening-control") ||
+		handler.acceptsChannel(inactivity.ButtonOpeningCustomID, "performance") {
+		t.Fatal("opening control is not restricted to its configured channel")
+	}
+}
+
 func v2Payload() messages.Payload {
 	return messages.Payload{Components: []messages.Component{messages.Component(`{"type":10,"content":"Rules"}`)}, AllowedMentions: messages.AllowedMentions{Parse: []string{}}}
 }

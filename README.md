@@ -17,6 +17,7 @@ DISCORD_BOT_TOKEN=
 DISCORD_BOT_GUILD_ID=
 DISCORD_BOT_API_KEY=
 DISCORD_BOT_PERFORMANCE_CHANNEL_ID=
+DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=
 ```
 
@@ -36,6 +37,7 @@ DISCORD_BOT_PERFORMANCE_TIMEZONE=America/Bogota
 
 DISCORD_BOT_INACTIVITY_ENABLED=true
 DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
+DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=123456789012345678
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=987654321098765432
 DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
 ```
@@ -60,7 +62,7 @@ Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.
 
 El bot publica el panel de empleados en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. **Ver inactivos** abre una lista efímera y paginada de 20 registros que sólo ve quien la consulta, sin publicar mensajes adicionales en el canal. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`; sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mensaje público muestra únicamente su total.
 
-El bot publica otro panel administrado en ese mismo canal de rendimiento con **Accionar apertura**. El dashboard, el panel de empleados y el control de apertura comparten canal, pero son mensajes separados. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` es obligatorio y únicamente selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`.
+El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`.
 
 Las keys de los tres mensajes están fijadas internamente como `business-performance`, `inactivity-dismissals` y `business-opening-control`; no requieren variables de entorno.
 
