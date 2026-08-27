@@ -135,6 +135,17 @@ func registerPerformanceRoutes(router fiber.Router, service PerformanceService) 
 		}
 		return ctx.JSON(state)
 	})
+	router.Post("/current-period/backfill", func(ctx *fiber.Ctx) error {
+		var request performance.CurrentPeriodBackfill
+		if err := ctx.BodyParser(&request); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
+		}
+		state, err := service.BackfillCurrentPeriod(ctx.UserContext(), request)
+		if err != nil {
+			return performanceError(err)
+		}
+		return ctx.JSON(state)
+	})
 }
 
 func performanceError(err error) error {
@@ -145,6 +156,8 @@ func performanceError(err error) error {
 		return fiber.NewError(fiber.StatusConflict, err.Error())
 	case errors.Is(err, performance.ErrDisabled):
 		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, performance.ErrInvalidBackfill):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	default:
 		return fiber.NewError(fiber.StatusBadGateway, "performance refresh failed")
 	}

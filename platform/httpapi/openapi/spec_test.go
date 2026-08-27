@@ -30,7 +30,8 @@ func TestSpecProtectsPrivateOperations(t *testing.T) {
 		t.Fatalf("Spec is invalid JSON: %v", err)
 	}
 	privateOperations := [][2]string{{"/api/performance", "get"},
-		{"/api/performance/refresh", "post"}, {"/api/inactivity", "get"}, {"/api/inactivity", "post"},
+		{"/api/performance/refresh", "post"}, {"/api/performance/current-period/backfill", "post"},
+		{"/api/inactivity", "get"}, {"/api/inactivity", "post"},
 		{"/api/inactivity/{name}", "delete"}, {"/api/announcements/opening", "post"},
 		{"/api/announcements/opening/cooldown", "get"},
 		{"/api/announcements/opening/cooldown", "delete"}, {"/api/messages", "get"},

@@ -12,6 +12,8 @@ var (
 	ErrConflict = errors.New("business performance conflict")
 	// ErrDisabled reports that collection is not enabled.
 	ErrDisabled = errors.New("business performance is disabled")
+	// ErrInvalidBackfill reports an unsafe or malformed current-period correction.
+	ErrInvalidBackfill = errors.New("invalid current-period backfill")
 )
 
 // Source reads one current business snapshot.

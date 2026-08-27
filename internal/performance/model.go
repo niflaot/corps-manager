@@ -3,6 +3,7 @@ package performance
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -95,6 +96,14 @@ type Period struct {
 	EmployeeServiceMinutes map[string]int64 `json:"employeeServiceMinutes"`
 }
 
+// CurrentPeriodBackfill identifies employees whose first observed counters belong to the active period.
+type CurrentPeriodBackfill struct {
+	// PeriodStartedAt guards against correcting a different weekly period.
+	PeriodStartedAt time.Time `json:"periodStartedAt"`
+	// CharacterIDs contains the newly joined employees to correct.
+	CharacterIDs []int64 `json:"characterIds"`
+}
+
 // State is the persisted business performance aggregate.
 type State struct {
 	// BusinessID identifies the monitored business.
@@ -127,6 +136,27 @@ type State struct {
 	Revision uint64 `json:"revision"`
 	// UpdatedAt is the persistence update timestamp.
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+func (state *State) backfillCurrentPeriod(characterIDs []int64) error {
+	seen := make(map[int64]bool, len(characterIDs))
+	for _, characterID := range characterIDs {
+		if characterID <= 0 || seen[characterID] {
+			return ErrInvalidBackfill
+		}
+		seen[characterID] = true
+		key := strconv.FormatInt(characterID, 10)
+		employee, exists := state.Employees[key]
+		if !exists || !employee.Active {
+			return ErrInvalidBackfill
+		}
+		employee.PeriodGenerated = employee.HistoricalGenerated
+		employee.PeriodServiceMinutes = employee.HistoricalServiceMinutes
+		state.Employees[key] = employee
+	}
+	state.HistoricalGenerated, state.PeriodGenerated, state.HistoricalServiceMinutes,
+		state.PeriodServiceMinutes = totals(state.Employees)
+	return nil
 }
 
 func employeeDisplayName(value string) string {

@@ -1,4 +1,4 @@
-# corps-manager v1.4.0
+# corps-manager v1.5.0
 
 Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar expulsiones por inactividad. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
 
@@ -95,6 +95,7 @@ Rutas protegidas con `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
 
 - `GET /api/performance`: estado persistido, totales, empleados y cortes.
 - `POST /api/performance/refresh`: fuerza una consulta y actualiza el dashboard.
+- `POST /api/performance/current-period/backfill`: corrige el primer snapshot de empleados nuevos dentro del periodo indicado.
 - `GET /api/inactivity`: consulta el registro de expulsados.
 - `POST /api/inactivity` con `{"name":"Nombre_Apellido"}`: añade un empleado.
 - `DELETE /api/inactivity/Nombre_Apellido`: retira un empleado.

@@ -79,6 +79,7 @@ func (service *Service) Refresh(ctx context.Context) (State, error) {
 }
 
 func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time) State {
+	wasInitialized := state.Initialized
 	if state.Employees == nil {
 		state.Employees = map[string]EmployeeState{}
 	}
@@ -105,6 +106,9 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 		employee, exists := state.Employees[key]
 		if !exists {
 			employee.HistoricalGenerated = max(observed.Earnings, 0)
+			if wasInitialized {
+				employee.PeriodGenerated = employee.HistoricalGenerated
+			}
 		} else if observed.Earnings > employee.Baseline {
 			delta := observed.Earnings - employee.Baseline
 			employee.HistoricalGenerated += delta
@@ -113,6 +117,9 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 		serviceCounter := max(observed.HistoricalDutyTime, 0) + max(observed.DutyTime, 0)
 		if !employee.ServiceInitialized {
 			employee.HistoricalServiceMinutes = serviceCounter
+			if wasInitialized {
+				employee.PeriodServiceMinutes = serviceCounter
+			}
 			employee.ServiceInitialized = true
 		} else if serviceCounter > employee.ServiceBaseline {
 			delta := serviceCounter - employee.ServiceBaseline
@@ -131,6 +138,40 @@ func (service *Service) aggregate(state State, snapshot Snapshot, now time.Time)
 	state.Initialized = true
 	state.LastCollectedAt = now
 	return state
+}
+
+// BackfillCurrentPeriod moves selected new employees' first observed counters into the active period.
+func (service *Service) BackfillCurrentPeriod(ctx context.Context, request CurrentPeriodBackfill) (State, error) {
+	if !service.config.Enabled {
+		return State{}, ErrDisabled
+	}
+	if request.PeriodStartedAt.IsZero() || len(request.CharacterIDs) == 0 || len(request.CharacterIDs) > 100 {
+		return State{}, ErrInvalidBackfill
+	}
+	for attempt := 0; attempt < saveAttempts; attempt++ {
+		current, err := service.repository.Get(ctx, service.config.BusinessID)
+		if err != nil {
+			return State{}, err
+		}
+		if !current.PeriodStartedAt.Equal(request.PeriodStartedAt) {
+			return State{}, ErrInvalidBackfill
+		}
+		if err := current.backfillCurrentPeriod(request.CharacterIDs); err != nil {
+			return State{}, err
+		}
+		saved, err := service.repository.Save(ctx, current, current.Revision)
+		if errors.Is(err, ErrConflict) {
+			continue
+		}
+		if err != nil {
+			return State{}, fmt.Errorf("save current-period backfill: %w", err)
+		}
+		if err := service.publish(ctx, saved); err != nil {
+			return saved, fmt.Errorf("publish current-period backfill: %w", err)
+		}
+		return saved, nil
+	}
+	return State{}, ErrConflict
 }
 
 func (state *State) archive(boundary time.Time, limit int) {

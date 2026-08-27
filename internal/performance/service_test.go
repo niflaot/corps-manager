@@ -79,6 +79,42 @@ func TestAggregateDoesNotSubtractResetCounter(t *testing.T) {
 	}
 }
 
+func TestAggregateCountsFirstObservationForEmployeeAddedAfterInitialization(t *testing.T) {
+	service := &Service{config: Config{CutoffWeekday: time.Tuesday, Timezone: time.UTC, HistoryLimit: 10}}
+	now := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	state := service.aggregate(State{BusinessID: 1}, Snapshot{BusinessID: 1,
+		Employees: []EmployeeSnapshot{{CharacterID: 1, Earnings: 100, HistoricalDutyTime: 60}}}, now)
+	state = service.aggregate(state, Snapshot{BusinessID: 1, Employees: []EmployeeSnapshot{
+		{CharacterID: 1, Earnings: 100, HistoricalDutyTime: 60},
+		{CharacterID: 2, Earnings: 500, HistoricalDutyTime: 30, DutyTime: 20},
+	}}, now.Add(time.Hour))
+	added := state.Employees["2"]
+	if added.HistoricalGenerated != 500 || added.PeriodGenerated != 500 ||
+		added.HistoricalServiceMinutes != 50 || added.PeriodServiceMinutes != 50 {
+		t.Fatalf("new employee aggregate = %#v", added)
+	}
+}
+
+func TestBackfillCurrentPeriodCorrectsOnlySelectedActiveEmployees(t *testing.T) {
+	state := State{Employees: map[string]EmployeeState{
+		"1": {HistoricalGenerated: 1000, PeriodGenerated: 200, HistoricalServiceMinutes: 60,
+			PeriodServiceMinutes: 10, Active: true},
+		"2": {HistoricalGenerated: 500, PeriodGenerated: 100, HistoricalServiceMinutes: 30,
+			PeriodServiceMinutes: 5, Active: true},
+	}}
+	if err := state.backfillCurrentPeriod([]int64{1}); err != nil {
+		t.Fatal(err)
+	}
+	if state.Employees["1"].PeriodGenerated != 1000 || state.Employees["1"].PeriodServiceMinutes != 60 ||
+		state.Employees["2"].PeriodGenerated != 100 || state.PeriodGenerated != 1100 ||
+		state.PeriodServiceMinutes != 65 {
+		t.Fatalf("backfilled state = %#v", state)
+	}
+	if err := state.backfillCurrentPeriod([]int64{1, 1}); err != ErrInvalidBackfill {
+		t.Fatalf("duplicate backfill error = %v", err)
+	}
+}
+
 func TestRenderProducesValidManagedMessage(t *testing.T) {
 	config := Config{BusinessID: 1995, ChannelID: "456", Timezone: time.UTC}
 	state := State{BusinessID: 1995, Name: "Warehouse", Bank: 1000, HistoricalGenerated: 300,

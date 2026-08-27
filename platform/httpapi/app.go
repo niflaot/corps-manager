@@ -37,6 +37,8 @@ type PerformanceService interface {
 	Get(context.Context) (performance.State, error)
 	// Refresh immediately collects and publishes a new snapshot.
 	Refresh(context.Context) (performance.State, error)
+	// BackfillCurrentPeriod corrects first observations for selected new employees.
+	BackfillCurrentPeriod(context.Context, performance.CurrentPeriodBackfill) (performance.State, error)
 }
 
 // InactivityService contains HTTP-facing inactivity registry use cases.
