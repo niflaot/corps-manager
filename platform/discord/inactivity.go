@@ -58,6 +58,10 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 		customID != inactivityRemoveModalID {
 		return
 	}
+	if customID == inactivity.ButtonOpeningCustomID {
+		handler.announceOpening(session, event)
+		return
+	}
 	if !canManageRegistry(event) {
 		handler.respond(session, event.Interaction, "No tienes permiso para administrar este registro.")
 		return
@@ -67,8 +71,6 @@ func (handler *inactivityInteractionHandler) handle(session *discordgo.Session, 
 		handler.openModal(session, event.Interaction, inactivityAddModalID, "Añadir empleado expulsado")
 	case inactivity.ButtonRemoveCustomID:
 		handler.openModal(session, event.Interaction, inactivityRemoveModalID, "Retirar empleado del registro")
-	case inactivity.ButtonOpeningCustomID:
-		handler.announceOpening(session, event)
 	case inactivityAddModalID, inactivityRemoveModalID:
 		handler.submit(session, event, customID)
 	}

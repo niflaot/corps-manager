@@ -1,6 +1,6 @@
 # corps-manager v1.5.0
 
-Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar expulsiones por inactividad. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
+Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar operaciones internas. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
 
 El dashboard es un mensaje administrado con Components V2. Su definición y el ID remoto quedan en PostgreSQL: cada actualización edita el mismo mensaje y el reconciliador lo restaura si fue alterado o eliminado.
 
@@ -19,6 +19,8 @@ DISCORD_BOT_API_KEY=
 DISCORD_BOT_PERFORMANCE_CHANNEL_ID=
 DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=
+DISCORD_BOT_CUSTOMERS_CHANNEL_ID=
+DISCORD_BOT_AGREEMENTS_CHANNEL_ID=
 ```
 
 El bot sólo necesita `View Channel`, `Send Messages` y `Manage Messages` en el canal configurado. No usa verificación, OAuth, Redis, el intent privilegiado de miembros ni requiere permiso de administrador.
@@ -40,6 +42,14 @@ DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
 DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=123456789012345678
 DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=987654321098765432
 DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
+
+DISCORD_BOT_CUSTOMERS_ENABLED=true
+DISCORD_BOT_CUSTOMERS_CHANNEL_ID=123456789012345678
+DISCORD_BOT_CUSTOMERS_REFRESH_INTERVAL=6h
+
+DISCORD_BOT_AGREEMENTS_ENABLED=true
+DISCORD_BOT_AGREEMENTS_CHANNEL_ID=123456789012345678
+DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL=6h
 ```
 
 `DISCORD_BOT_PERFORMANCE_ENDPOINT` debe apuntar al `POST /api/query` de `sarp-scrapper`. El bot envía esta consulta, por lo que el token real de SARP permanece únicamente en `sarp-scrapper`:
@@ -62,11 +72,21 @@ Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.
 
 El bot publica el panel de empleados en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. **Ver inactivos** abre una lista efímera y paginada de 20 registros que sólo ve quien la consulta, sin publicar mensajes adicionales en el canal. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`; sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mensaje público muestra únicamente su total.
 
-El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`.
+El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. Cualquier miembro con acceso al canal puede usarlo. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`.
 
-Las keys de los tres mensajes están fijadas internamente como `business-performance`, `inactivity-dismissals` y `business-opening-control`; no requieren variables de entorno.
+Las keys de los mensajes están fijadas internamente; no requieren variables de entorno.
 
 El botón y la API comparten un cooldown persistente de `DISCORD_BOT_ANNOUNCEMENT_COOLDOWN` (30 minutos por defecto). La adquisición es atómica, sobrevive reinicios y evita anuncios duplicados por pulsaciones simultáneas. Si Discord rechaza la publicación, el cooldown se libera automáticamente.
+
+## Clientes frecuentes
+
+`DISCORD_BOT_CUSTOMERS_CHANNEL_ID` contiene un panel administrado con el ranking de visitas. **Registrar atención** abre un formulario para el nombre del cliente; el bot lo normaliza a minúsculas y sustituye espacios, guiones y separadores por `_`. Cada atención conserva el ID estable de Discord y actualiza el apodo visible, por lo que una persona no se duplica aunque cambie de nombre.
+
+**Ver clientes** y **Consultar cliente** responden de forma efímera para no llenar el canal. El detalle muestra cuántas veces atendió cada miembro y su ID de Discord. **Eliminar cliente** borra todo el historial del cliente y sólo funciona para el dueño real de la guild, validado directamente contra Discord.
+
+## Convenios
+
+El bot coloca un panel separado con **Añadir convenio** en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. El formulario solicita ID, descripción y una URL HTTPS opcional para la foto. El listado administrado se publica y actualiza en `DISCORD_BOT_AGREEMENTS_CHANNEL_ID`; **Ver convenios** permite consultar el resto de manera privada cuando la lista visible supera diez elementos.
 
 ## Base de datos
 
@@ -78,7 +98,7 @@ liquibase --defaults-file=database/liquibase.properties validate
 liquibase --defaults-file=database/liquibase.properties update
 ```
 
-Los changelogs de dominio están en `internal/messages/postgres/`, `internal/performance/postgres/`, `internal/inactivity/postgres/` e `internal/announcements/postgres/`. La aplicación no modifica el esquema durante el arranque.
+Los changelogs pertenecen a cada dominio bajo `internal/*/postgres/`, incluidos clientes y convenios. La aplicación no modifica el esquema durante el arranque.
 
 ## Ejecutar
 
@@ -129,9 +149,12 @@ curl -X DELETE https://corps.niflaot.dev/api/announcements/opening/cooldown \
 - `internal/performance/`: periodos, deltas, histórico y dashboard.
 - `internal/inactivity/`: registro durable, formulario y segundo mensaje.
 - `internal/announcements/`: apertura pública y cooldown durable compartido.
+- `internal/customers/`: clientes frecuentes, visitas y responsables de atención.
+- `internal/agreements/`: convenios y listado público administrado.
 - `platform/sarp/`: cliente del endpoint configurable de `sarp-scrapper`.
 - `platform/httpapi/`: API Fiber y contrato OpenAPI/Scalar.
 - `platform/discord/`: sesión DiscordGo y gateway de mensajes.
+- `platform/customerdiscord/` y `platform/agreementdiscord/`: formularios e interacciones de cada dominio.
 - `platform/postgres/`: pool PostgreSQL compartido.
 - `internal/cronjob/`: trabajos periódicos context-aware.
 
