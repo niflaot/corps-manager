@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ const (
 	detailModalID      = "customers:detail:submit"
 	deleteModalID      = "customers:delete:submit"
 	nameInputID        = "customer_name"
+	amountInputID      = "customer_amount"
 )
 
 type handler struct {
@@ -33,9 +35,7 @@ func (handler *handler) handle(session *discordgo.Session, event *discordgo.Inte
 	customID := customID(event)
 	switch customID {
 	case customers.ButtonRecordCustomID:
-		handler.openNameModal(session, event.Interaction, recordModalID, "Registrar atención")
-	case customers.ButtonListCustomID:
-		handler.showList(session, event)
+		handler.openRecordModal(session, event.Interaction)
 	case customers.ButtonDetailCustomID:
 		handler.openNameModal(session, event.Interaction, detailModalID, "Consultar cliente")
 	case customers.ButtonDeleteCustomID:
@@ -50,6 +50,27 @@ func (handler *handler) handle(session *discordgo.Session, event *discordgo.Inte
 		if handler.requireOwner(session, event) {
 			handler.delete(session, event)
 		}
+	}
+}
+
+func (handler *handler) openRecordModal(session *discordgo.Session, interaction *discordgo.Interaction) {
+	ctx, cancel := context.WithTimeout(context.Background(), interactionTimeout)
+	defer cancel()
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{
+			CustomID: nameInputID, Label: "Nombre del cliente", Style: discordgo.TextInputShort,
+			Placeholder: "Ejemplo: Jane Doe", Required: true, MinLength: 2, MaxLength: 64}}},
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{discordgo.TextInput{
+			CustomID: amountInputID, Label: "Monto gastado", Style: discordgo.TextInputShort,
+			Placeholder: "Ejemplo: 2500", Required: true, MinLength: 1, MaxLength: 20}}},
+	}
+	err := session.InteractionRespond(interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseModal,
+		Data: &discordgo.InteractionResponseData{CustomID: recordModalID, Title: "Registrar atención",
+			Components: components},
+	}, discordgo.WithContext(ctx))
+	if err != nil {
+		handler.log.Error("open customer record modal", zap.Error(err))
 	}
 }
 
@@ -75,13 +96,19 @@ func (handler *handler) record(session *discordgo.Session, event *discordgo.Inte
 	defer cancel()
 	userID, displayName := actor(event)
 	name := input(event.ModalSubmitData(), nameInputID)
-	customer, err := handler.service.Record(ctx, name, userID, displayName)
+	amount, err := parseAmount(input(event.ModalSubmitData(), amountInputID))
+	if err != nil {
+		handler.respondError(ctx, session, event.Interaction, "registrar la atención", customers.ErrInvalidAmount)
+		return
+	}
+	customer, err := handler.service.Record(ctx, name, userID, displayName, amount)
 	if err != nil {
 		handler.respondError(ctx, session, event.Interaction, "registrar la atención", err)
 		return
 	}
 	handler.respond(ctx, session, event.Interaction, fmt.Sprintf(
-		"✅ Atención registrada para `%s`. Ahora tiene **%d** visitas.", customer.Name, customer.Visits))
+		"✅ Atención registrada para `%s`: **$%d**. Acumula **%d** visitas y **$%d**.",
+		customer.Name, amount, customer.Visits, customer.TotalSpent))
 }
 
 func (handler *handler) delete(session *discordgo.Session, event *discordgo.InteractionCreate) {
@@ -126,10 +153,24 @@ func (handler *handler) respondError(ctx context.Context, session *discordgo.Ses
 		message = "⚠️ Ese cliente no existe."
 	case errors.Is(err, customers.ErrInvalidAttendant):
 		message = "❌ No fue posible identificar tu usuario de Discord."
+	case errors.Is(err, customers.ErrInvalidAmount):
+		message = "❌ El monto debe ser un número entre $0 y $1,000,000,000."
 	default:
 		handler.log.Error("customer interaction failed", zap.String("operation", operation), zap.Error(err))
 	}
 	handler.respond(ctx, session, interaction, message)
+}
+
+func parseAmount(value string) (int64, error) {
+	cleaned := strings.NewReplacer("$", "", ",", "", ".", "", " ", "").Replace(strings.TrimSpace(value))
+	if cleaned == "" {
+		return 0, customers.ErrInvalidAmount
+	}
+	amount, err := strconv.ParseInt(cleaned, 10, 64)
+	if err != nil || amount < 0 {
+		return 0, customers.ErrInvalidAmount
+	}
+	return amount, nil
 }
 
 func customID(event *discordgo.InteractionCreate) string {

@@ -30,7 +30,8 @@ func TestNormalizeNameRejectsPunctuation(t *testing.T) {
 func TestRenderProducesValidManagedMessage(t *testing.T) {
 	t.Parallel()
 	definition, err := Render([]Customer{{Name: "jane_doe", Visits: 3}},
-		Config{ChannelID: "123456789012345678"}, "987654321098765432")
+		Config{ChannelID: "123456789012345678", PublicURL: "https://corps.niflaot.dev/customers"},
+		"987654321098765432")
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}

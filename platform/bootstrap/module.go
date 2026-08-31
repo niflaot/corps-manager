@@ -18,6 +18,7 @@ import (
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/clock"
 	"github.com/niflaot/corps-manager/platform/customerdiscord"
+	"github.com/niflaot/corps-manager/platform/customerweb"
 	"github.com/niflaot/corps-manager/platform/discord"
 	"github.com/niflaot/corps-manager/platform/health"
 	"github.com/niflaot/corps-manager/platform/httpapi"
@@ -49,6 +50,7 @@ var Module = fx.Module("bootstrap",
 	agreements.Module,
 	customerdiscord.Module,
 	agreementdiscord.Module,
+	customerweb.Module,
 	health.Module,
 	cronjob.Module,
 	httpapi.Module,

@@ -71,6 +71,8 @@ type Dependencies struct {
 	Inactivity InactivityService
 	// Announcements manages public business-opening announcements.
 	Announcements AnnouncementService
+	// CustomerPage renders the public read-only frequent-customer directory.
+	CustomerPage fiber.Handler
 }
 
 // InactivityMutationRequest contains one Nombre_Apellido registry value.

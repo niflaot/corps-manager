@@ -9,33 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const customerListLimit = 25
-
-func (handler *handler) showList(session *discordgo.Session, event *discordgo.InteractionCreate) {
-	ctx, cancel := context.WithTimeout(context.Background(), interactionTimeout)
-	defer cancel()
-	items, err := handler.service.List(ctx)
-	if err != nil {
-		handler.respondError(ctx, session, event.Interaction, "consultar los clientes", err)
-		return
-	}
-	var content strings.Builder
-	fmt.Fprintf(&content, "**Clientes frecuentes** · Total: %d\n", len(items))
-	if len(items) == 0 {
-		content.WriteString("No hay clientes registrados.")
-	} else {
-		content.WriteString("```text\n")
-		for index, customer := range items[:min(len(items), customerListLimit)] {
-			fmt.Fprintf(&content, "%2d. %-40s %d visitas\n", index+1, customer.Name, customer.Visits)
-		}
-		content.WriteString("```")
-		if len(items) > customerListLimit {
-			fmt.Fprintf(&content, "Mostrando los primeros %d.", customerListLimit)
-		}
-	}
-	handler.respond(ctx, session, event.Interaction, content.String())
-}
-
 func (handler *handler) showDetail(session *discordgo.Session, event *discordgo.InteractionCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), interactionTimeout)
 	defer cancel()
@@ -45,8 +18,8 @@ func (handler *handler) showDetail(session *discordgo.Session, event *discordgo.
 		return
 	}
 	var content strings.Builder
-	fmt.Fprintf(&content, "**Cliente:** `%s`\n**Visitas:** %d\n**Personas que lo atendieron:** %d\n",
-		item.Name, item.Visits, len(item.Attendants))
+	fmt.Fprintf(&content, "**Cliente:** `%s`\n**Visitas:** %d\n**Gasto acumulado:** $%d\n**Personas que lo atendieron:** %d\n",
+		item.Name, item.Visits, item.TotalSpent, len(item.Attendants))
 	if len(item.Attendants) > 0 {
 		content.WriteString("```text\n")
 		for _, attendant := range item.Attendants[:min(len(item.Attendants), 15)] {

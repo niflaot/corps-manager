@@ -13,8 +13,6 @@ const (
 	customerAccent     = 0x3498db
 	// ButtonRecordCustomID identifies the record-visit action.
 	ButtonRecordCustomID = "customers:record"
-	// ButtonListCustomID identifies the private customer ranking.
-	ButtonListCustomID = "customers:list"
 	// ButtonDetailCustomID identifies the customer-detail action.
 	ButtonDetailCustomID = "customers:detail"
 	// ButtonDeleteCustomID identifies the owner-only delete action.
@@ -29,6 +27,7 @@ type component struct {
 	Style      int         `json:"style,omitempty"`
 	Label      string      `json:"label,omitempty"`
 	CustomID   string      `json:"custom_id,omitempty"`
+	URL        string      `json:"url,omitempty"`
 	Components []component `json:"components,omitempty"`
 	Accent     int         `json:"accent_color,omitempty"`
 }
@@ -41,7 +40,8 @@ func Render(customers []Customer, config Config, guildID string) (messages.Defin
 		ranking.WriteString("Aún no hay visitas registradas.")
 	} else {
 		for index, customer := range customers[:min(len(customers), 10)] {
-			fmt.Fprintf(&ranking, "%d. `%s` — **%d** visitas\n", index+1, customer.Name, customer.Visits)
+			fmt.Fprintf(&ranking, "%d. `%s` — **%d** visitas · **$%d**\n",
+				index+1, customer.Name, customer.Visits, customer.TotalSpent)
 		}
 		if len(customers) > 10 {
 			fmt.Fprintf(&ranking, "\nY %d clientes más. Usa **Ver clientes**.", len(customers)-10)
@@ -51,7 +51,7 @@ func Render(customers []Customer, config Config, guildID string) (messages.Defin
 		{Type: 10, Content: ranking.String()}, {Type: 14, Divider: true, Spacing: 1},
 		{Type: 1, Components: []component{
 			{Type: 2, Style: 3, Label: "Registrar atención", CustomID: ButtonRecordCustomID},
-			{Type: 2, Style: 1, Label: "Ver clientes", CustomID: ButtonListCustomID},
+			{Type: 2, Style: 5, Label: "Ver clientes", URL: config.PublicURL},
 			{Type: 2, Style: 2, Label: "Consultar cliente", CustomID: ButtonDetailCustomID},
 			{Type: 2, Style: 4, Label: "Eliminar cliente", CustomID: ButtonDeleteCustomID},
 		}}}

@@ -14,6 +14,7 @@ import (
 )
 
 const publishAttempts = 3
+const maximumVisitAmount = int64(1_000_000_000)
 
 // Service manages frequent customers and their Discord panel.
 type Service struct {
@@ -30,6 +31,10 @@ func NewService(config Config, repository Repository, messageService *messages.S
 
 // NormalizeName converts a customer name to lowercase underscore form.
 func NormalizeName(value string) (string, error) {
+	return normalizeName(value, 2)
+}
+
+func normalizeName(value string, minimumLength int) (string, error) {
 	var result strings.Builder
 	pendingSeparator := false
 	for _, current := range strings.TrimSpace(value) {
@@ -47,14 +52,15 @@ func NormalizeName(value string) (string, error) {
 		}
 	}
 	normalized := result.String()
-	if len([]rune(normalized)) < 2 || len(normalized) > 64 {
+	if len([]rune(normalized)) < minimumLength || len(normalized) > 64 {
 		return "", ErrInvalidName
 	}
 	return normalized, nil
 }
 
 // Record registers one visit made by a Discord attendant.
-func (service *Service) Record(ctx context.Context, name string, userID string, displayName string) (Customer, error) {
+func (service *Service) Record(ctx context.Context, name string, userID string, displayName string,
+	amount int64) (Customer, error) {
 	if !service.config.Enabled {
 		return Customer{}, ErrDisabled
 	}
@@ -66,7 +72,10 @@ func (service *Service) Record(ctx context.Context, name string, userID string, 
 	if !snowflakePattern.MatchString(userID) || displayName == "" || len([]rune(displayName)) > 80 {
 		return Customer{}, ErrInvalidAttendant
 	}
-	customer, err := service.repository.Record(ctx, normalized, userID, displayName)
+	if amount < 0 || amount > maximumVisitAmount {
+		return Customer{}, ErrInvalidAmount
+	}
+	customer, err := service.repository.Record(ctx, normalized, userID, displayName, amount)
 	if err != nil {
 		return Customer{}, err
 	}
@@ -79,6 +88,31 @@ func (service *Service) List(ctx context.Context) ([]Customer, error) {
 		return nil, ErrDisabled
 	}
 	return service.repository.List(ctx)
+}
+
+// Search returns customers matching normalized name, period, and ordering filters.
+func (service *Service) Search(ctx context.Context, query Query) ([]Customer, error) {
+	if !service.config.Enabled {
+		return nil, ErrDisabled
+	}
+	query.Name = strings.TrimSpace(query.Name)
+	if query.Name != "" {
+		normalized, err := normalizeName(query.Name, 1)
+		if err != nil {
+			return nil, err
+		}
+		query.Name = normalized
+	}
+	if query.Days < 0 || query.Days > 3650 {
+		return nil, ErrInvalidQuery
+	}
+	if query.Sort == "" {
+		query.Sort = SortSpend
+	}
+	if query.Sort != SortSpend && query.Sort != SortVisits && query.Sort != SortRecent && query.Sort != SortName {
+		return nil, ErrInvalidQuery
+	}
+	return service.repository.Search(ctx, query)
 }
 
 // Get returns one normalized customer and attendant history.

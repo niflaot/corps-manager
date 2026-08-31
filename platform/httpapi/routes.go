@@ -21,6 +21,9 @@ func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig C
 			Dependencies: healthService.Snapshot(ctx.UserContext()),
 		})
 	})
+	if dependencies.CustomerPage != nil {
+		application.Get("/customers", dependencies.CustomerPage)
+	}
 	if config.Environment.IsDevelopment() {
 		registerDocumentationRoutes(application)
 	}

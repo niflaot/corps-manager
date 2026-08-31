@@ -26,7 +26,9 @@ type Config struct {
 
 // Module provides HTTP configuration, routes, Fiber application, and server.
 var Module = fx.Module("httpapi", fx.Provide(
-	LoadConfig, provideDependencies, provideApplication, provideServer,
+	LoadConfig,
+	fx.Annotate(provideDependencies, fx.ParamTags("", "", "", "", `name:"customer_page"`)),
+	provideApplication, provideServer,
 ))
 
 // LoadConfig reads and validates HTTP API configuration.
@@ -46,9 +48,10 @@ func LoadConfig() (Config, error) {
 }
 
 func provideDependencies(messageService *messages.Service, performanceService *performance.Service,
-	inactivityService *inactivity.Service, announcementService *announcements.Service) Dependencies {
+	inactivityService *inactivity.Service, announcementService *announcements.Service,
+	customerPage fiber.Handler) Dependencies {
 	return Dependencies{Messages: messageService, Performance: performanceService, Inactivity: inactivityService,
-		Announcements: announcementService}
+		Announcements: announcementService, CustomerPage: customerPage}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

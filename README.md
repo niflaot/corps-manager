@@ -45,6 +45,7 @@ DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
 
 DISCORD_BOT_CUSTOMERS_ENABLED=true
 DISCORD_BOT_CUSTOMERS_CHANNEL_ID=123456789012345678
+DISCORD_BOT_CUSTOMERS_PUBLIC_URL=https://corps.niflaot.dev/customers
 DISCORD_BOT_CUSTOMERS_REFRESH_INTERVAL=6h
 
 DISCORD_BOT_AGREEMENTS_ENABLED=true
@@ -80,9 +81,11 @@ El botón y la API comparten un cooldown persistente de `DISCORD_BOT_ANNOUNCEMEN
 
 ## Clientes frecuentes
 
-`DISCORD_BOT_CUSTOMERS_CHANNEL_ID` contiene un panel administrado con el ranking de visitas. **Registrar atención** abre un formulario para el nombre del cliente; el bot lo normaliza a minúsculas y sustituye espacios, guiones y separadores por `_`. Cada atención conserva el ID estable de Discord y actualiza el apodo visible, por lo que una persona no se duplica aunque cambie de nombre.
+`DISCORD_BOT_CUSTOMERS_CHANNEL_ID` contiene un panel administrado con el ranking de visitas. **Registrar atención** solicita el nombre y el monto gastado; el bot normaliza el nombre a minúsculas y sustituye espacios, guiones y separadores por `_`. Cada atención conserva monto, fecha, ID estable de Discord y el apodo visible, por lo que una persona no se duplica aunque cambie de nombre.
 
-**Ver clientes** y **Consultar cliente** responden de forma efímera para no llenar el canal. El detalle muestra cuántas veces atendió cada miembro y su ID de Discord. **Eliminar cliente** borra todo el historial del cliente y sólo funciona para el dueño real de la guild, validado directamente contra Discord.
+**Ver clientes** abre `DISCORD_BOT_CUSTOMERS_PUBLIC_URL`, una página pública de solo lectura que permite buscar sin importar mayúsculas, espacios o `_`, ordenar por gasto, visitas, fecha o nombre y limitar los cálculos a los últimos X días. **Consultar cliente** conserva el detalle privado con responsables e IDs. **Eliminar cliente** borra todo el historial y sólo funciona para el dueño real de la guild, validado directamente contra Discord.
+
+Los filtros por periodo y los importes comienzan con las atenciones registradas después de aplicar la migración de gasto; los contadores históricos anteriores se conservan, pero no contienen monto ni eventos diarios que puedan reconstruirse con precisión.
 
 ## Convenios
 
@@ -109,6 +112,7 @@ go run ./cmd serve
 Rutas públicas:
 
 - `GET /status`
+- `GET /customers`: directorio filtrable de clientes frecuentes.
 - `GET /docs` y `GET /openapi.json` únicamente en `development`
 
 Rutas protegidas con `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
