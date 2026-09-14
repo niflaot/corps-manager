@@ -17,7 +17,8 @@ type Config struct {
 	Enabled bool `env:"DISCORD_BOT_INACTIVITY_ENABLED" envDefault:"true"`
 	// ChannelID selects the Discord channel containing the registry message.
 	ChannelID string `env:"DISCORD_BOT_PERFORMANCE_CHANNEL_ID"`
-	// AnnouncementChannelID receives public business-opening announcements.
+	// AnnouncementChannelID receives public business-opening announcements. An
+	// empty value disables the opening-control panel and announcements.
 	AnnouncementChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID"`
 	// AnnouncementControlChannelID contains the separate opening-control message.
 	AnnouncementControlChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID"`
@@ -43,11 +44,13 @@ func LoadConfig() (Config, error) {
 	if !discordSnowflakePattern.MatchString(config.ChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_PERFORMANCE_CHANNEL_ID must be a Discord snowflake")
 	}
-	if !discordSnowflakePattern.MatchString(config.AnnouncementChannelID) {
-		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
-	}
-	if !discordSnowflakePattern.MatchString(config.AnnouncementControlChannelID) {
-		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID must be a Discord snowflake")
+	if config.AnnouncementChannelID != "" {
+		if !discordSnowflakePattern.MatchString(config.AnnouncementChannelID) {
+			return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
+		}
+		if !discordSnowflakePattern.MatchString(config.AnnouncementControlChannelID) {
+			return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID must be a Discord snowflake")
+		}
 	}
 	return config, nil
 }
