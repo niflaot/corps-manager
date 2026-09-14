@@ -13,7 +13,8 @@ var channelPattern = regexp.MustCompile(`^[0-9]{1,20}$`)
 
 // Config controls business-opening announcements and their cooldown.
 type Config struct {
-	// ChannelID receives public business-opening announcements.
+	// ChannelID receives public business-opening announcements. An empty
+	// value disables business-opening announcements.
 	ChannelID string `env:"DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID"`
 	// Cooldown blocks repeated announcements for this duration.
 	Cooldown time.Duration `env:"DISCORD_BOT_ANNOUNCEMENT_COOLDOWN" envDefault:"30m"`
@@ -29,7 +30,7 @@ func LoadConfig() (Config, error) {
 	if config.Cooldown <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_COOLDOWN must be positive")
 	}
-	if !channelPattern.MatchString(config.ChannelID) {
+	if config.ChannelID != "" && !channelPattern.MatchString(config.ChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID must be a Discord snowflake")
 	}
 	return config, nil

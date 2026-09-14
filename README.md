@@ -34,7 +34,7 @@ DISCORD_BOT_PERFORMANCE_ENDPOINT_TOKEN=
 DISCORD_BOT_PERFORMANCE_BUSINESS_ID=1995
 DISCORD_BOT_PERFORMANCE_CHANNEL_ID=123456789012345678
 DISCORD_BOT_PERFORMANCE_INTERVAL=6h
-DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY=Tuesday
+DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY=Sunday
 DISCORD_BOT_PERFORMANCE_TIMEZONE=America/Bogota
 
 DISCORD_BOT_INACTIVITY_ENABLED=true
@@ -65,7 +65,7 @@ DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL=6h
 
 Al iniciar, el bot consulta inmediatamente y luego repite cada seis horas. El primer muestreo registra los valores actuales como histórico y establece la línea base semanal en cero. Los siguientes muestreos suman únicamente incrementos positivos de `earnings` y del contador de servicio `historical_duty_time + duty_time`; una reducción o reinicio cambia la línea base sin restar del histórico.
 
-Cada martes a las 00:00 en `America/Bogota` comienza un periodo nuevo. El corte anterior queda almacenado en PostgreSQL con dinero y minutos de servicio, tanto totales como desglosados por personaje. Se conservan 104 cortes por defecto. Los empleados que ya no aparecen quedan en el histórico, pero se marcan como inactivos.
+Cada domingo a las 00:00 en `America/Bogota` comienza un periodo nuevo. El corte anterior queda almacenado en PostgreSQL con dinero y minutos de servicio, tanto totales como desglosados por personaje. Se conservan 104 cortes por defecto. Los empleados que ya no aparecen quedan en el histórico, pero se marcan como inactivos.
 
 Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.`) y un ancho fijo de 50 columnas para evitar saltos de línea en Discord.
 
@@ -73,7 +73,7 @@ Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.
 
 El bot publica el panel de empleados en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. **Ver inactivos** abre una lista efímera y paginada de 20 registros que sólo ve quien la consulta, sin publicar mensajes adicionales en el canal. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`; sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mensaje público muestra únicamente su total.
 
-El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. Cualquier miembro con acceso al canal puede usarlo. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`.
+El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. Cualquier miembro con acceso al canal puede usarlo. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`. Deja `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` vacío para desactivar por completo los anuncios de apertura.
 
 Las keys de los mensajes están fijadas internamente; no requieren variables de entorno.
 

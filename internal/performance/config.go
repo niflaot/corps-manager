@@ -42,7 +42,7 @@ type Config struct {
 
 type rawConfig struct {
 	Config
-	CutoffWeekday string `env:"DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY" envDefault:"Tuesday"`
+	CutoffWeekday string `env:"DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY" envDefault:"Sunday"`
 	Timezone      string `env:"DISCORD_BOT_PERFORMANCE_TIMEZONE" envDefault:"America/Bogota"`
 }
 
