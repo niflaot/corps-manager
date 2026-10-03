@@ -72,3 +72,22 @@ func TestInvalidCompanyAndAgreementInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAgreementEditAndDeleteValidateInputs(t *testing.T) {
+	service := NewService(Config{Enabled: true}, nil, nil, "123")
+	if _, err := service.UpdateAgreement(context.Background(), "Bad Company", "id", "Description", ""); !errors.Is(err, ErrInvalidID) {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateAgreement(context.Background(), "company", "id", "x", ""); !errors.Is(err, ErrInvalidDescription) {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateAgreement(context.Background(), "company", "id", "Description", "http://example.com/a.png"); !errors.Is(err, ErrInvalidImageURL) {
+		t.Fatal(err)
+	}
+	if err := service.DeleteAgreement(context.Background(), "company", "Bad Id"); !errors.Is(err, ErrInvalidID) {
+		t.Fatal(err)
+	}
+	if err := NewService(Config{}, nil, nil, "123").DeleteAgreement(context.Background(), "company", "id"); !errors.Is(err, ErrDisabled) {
+		t.Fatal(err)
+	}
+}

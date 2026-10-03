@@ -14,6 +14,8 @@ var (
 	ErrCompanyInUse = errors.New("company has agreements")
 	// ErrInvalidCompany reports invalid company attributes.
 	ErrInvalidCompany = errors.New("invalid company")
+	// ErrAgreementNotFound reports a missing agreement.
+	ErrAgreementNotFound = errors.New("agreement not found")
 	// ErrAlreadyExists reports a duplicate agreement identifier.
 	ErrAlreadyExists = errors.New("agreement already exists")
 	// ErrInvalidID reports an invalid agreement identifier.
@@ -66,6 +68,10 @@ type Repository interface {
 	DeleteCompany(context.Context, string) error
 	// Create inserts one unique agreement.
 	Create(context.Context, Agreement) (Agreement, error)
+	// UpdateAgreement replaces the description and image of an existing agreement.
+	UpdateAgreement(context.Context, Agreement) (Agreement, error)
+	// DeleteAgreement removes one agreement from a company.
+	DeleteAgreement(ctx context.Context, companyID string, id string) error
 	// List returns agreements ordered by identifier.
 	List(context.Context) ([]Agreement, error)
 }

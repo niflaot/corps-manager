@@ -15,6 +15,10 @@ const (
 	agreementsAccent            = 0x9b59b6
 	// ButtonAddCustomID identifies the add-agreement action.
 	ButtonAddCustomID = "agreements:add"
+	// ButtonItemEditCustomID identifies the edit-agreement action.
+	ButtonItemEditCustomID = "agreements:item-edit"
+	// ButtonItemDeleteCustomID identifies the delete-agreement action.
+	ButtonItemDeleteCustomID = "agreements:item-delete"
 	// ButtonCompanyAddCustomID identifies the add-company action.
 	ButtonCompanyAddCustomID = "agreements:company-add"
 	// ButtonCompanyEditCustomID identifies the edit-company action.
@@ -66,6 +70,8 @@ func Render(companies []Company, items []Agreement, config Config, guildID strin
 		{Type: 14, Divider: true, Spacing: 1}, {Type: 1, Components: []component{
 			{Type: 2, Style: 3, Label: "Añadir convenio", CustomID: ButtonAddCustomID},
 			{Type: 2, Style: 1, Label: "Ver convenios", CustomID: ButtonListCustomID},
+			{Type: 2, Style: 2, Label: "Editar convenio", CustomID: ButtonItemEditCustomID},
+			{Type: 2, Style: 4, Label: "Eliminar convenio", CustomID: ButtonItemDeleteCustomID},
 		}}, {Type: 1, Components: []component{
 			{Type: 2, Style: 3, Label: "Añadir empresa", CustomID: ButtonCompanyAddCustomID},
 			{Type: 2, Style: 2, Label: "Editar empresa", CustomID: ButtonCompanyEditCustomID},

@@ -39,18 +39,13 @@ func (service *Service) Create(ctx context.Context, companyID string, id string,
 		return Agreement{}, ErrInvalidCompany
 	}
 	id = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), " ", "_"))
-	description, imageURL, actor = strings.TrimSpace(description), strings.TrimSpace(imageURL), strings.TrimSpace(actor)
+	actor = strings.TrimSpace(actor)
 	if !agreementIDPattern.MatchString(id) {
 		return Agreement{}, ErrInvalidID
 	}
-	if len([]rune(description)) < 3 || len([]rune(description)) > 1000 {
-		return Agreement{}, ErrInvalidDescription
-	}
-	if imageURL != "" {
-		parsed, err := url.ParseRequestURI(imageURL)
-		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-			return Agreement{}, ErrInvalidImageURL
-		}
+	description, imageURL, err := validateDetails(description, imageURL)
+	if err != nil {
+		return Agreement{}, err
 	}
 	if !snowflakePattern.MatchString(actor) {
 		return Agreement{}, ErrInvalidID
@@ -61,6 +56,54 @@ func (service *Service) Create(ctx context.Context, companyID string, id string,
 		return Agreement{}, err
 	}
 	return agreement, service.Publish(ctx)
+}
+
+// UpdateAgreement replaces an agreement's description and image and refreshes the panels.
+func (service *Service) UpdateAgreement(ctx context.Context, companyID, id, description, imageURL string) (Agreement, error) {
+	if !service.config.Enabled {
+		return Agreement{}, ErrDisabled
+	}
+	if !agreementIDPattern.MatchString(companyID) || !agreementIDPattern.MatchString(id) {
+		return Agreement{}, ErrInvalidID
+	}
+	description, imageURL, err := validateDetails(description, imageURL)
+	if err != nil {
+		return Agreement{}, err
+	}
+	agreement, err := service.repository.UpdateAgreement(ctx, Agreement{CompanyID: companyID, ID: id,
+		Description: description, ImageURL: imageURL})
+	if err != nil {
+		return Agreement{}, err
+	}
+	return agreement, service.Publish(ctx)
+}
+
+// DeleteAgreement removes one agreement and refreshes the panels.
+func (service *Service) DeleteAgreement(ctx context.Context, companyID, id string) error {
+	if !service.config.Enabled {
+		return ErrDisabled
+	}
+	if !agreementIDPattern.MatchString(companyID) || !agreementIDPattern.MatchString(id) {
+		return ErrInvalidID
+	}
+	if err := service.repository.DeleteAgreement(ctx, companyID, id); err != nil {
+		return err
+	}
+	return service.Publish(ctx)
+}
+
+func validateDetails(description, imageURL string) (string, string, error) {
+	description, imageURL = strings.TrimSpace(description), strings.TrimSpace(imageURL)
+	if len([]rune(description)) < 3 || len([]rune(description)) > 1000 {
+		return "", "", ErrInvalidDescription
+	}
+	if imageURL != "" {
+		parsed, err := url.ParseRequestURI(imageURL)
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+			return "", "", ErrInvalidImageURL
+		}
+	}
+	return description, imageURL, nil
 }
 
 // List returns every configured agreement.

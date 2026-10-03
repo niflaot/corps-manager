@@ -46,9 +46,22 @@ func TestCompanyScopedAgreementsAndDeletion(t *testing.T) {
 	if _, err := store.Create(ctx, agreements.Agreement{CompanyID: "company-a", ID: "shared", Description: "Duplicate agreement", CreatedBy: "123"}); !errors.Is(err, agreements.ErrAlreadyExists) {
 		t.Fatal(err)
 	}
+	updated, err := store.UpdateAgreement(ctx, agreements.Agreement{CompanyID: "company-a", ID: "shared", Description: "Edited agreement", ImageURL: "https://example.com/a.png"})
+	if err != nil || updated.Description != "Edited agreement" || updated.CreatedBy != "123" {
+		t.Fatalf("updated=%v error=%v", updated, err)
+	}
+	if _, err := store.UpdateAgreement(ctx, agreements.Agreement{CompanyID: "company-a", ID: "missing", Description: "Edited agreement"}); !errors.Is(err, agreements.ErrAgreementNotFound) {
+		t.Fatal(err)
+	}
 	items, err := store.List(ctx)
 	if err != nil || len(items) != 2 || items[0].CompanyName != "company-a" {
 		t.Fatalf("items=%v error=%v", items, err)
+	}
+	if err := store.DeleteAgreement(ctx, "company-b", "shared"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteAgreement(ctx, "company-b", "shared"); !errors.Is(err, agreements.ErrAgreementNotFound) {
+		t.Fatal(err)
 	}
 	if err := store.DeleteCompany(ctx, "company-a"); !errors.Is(err, agreements.ErrCompanyInUse) {
 		t.Fatal(err)

@@ -39,7 +39,7 @@ func (handler *handler) handle(session *discordgo.Session, event *discordgo.Inte
 	id := customID(event)
 	ctx, cancel := context.WithTimeout(handler.ctx, interactionTimeout)
 	defer cancel()
-	if handler.handleCompany(ctx, session, event, id) {
+	if handler.handleCompany(ctx, session, event, id) || handler.handleItem(ctx, session, event, id) {
 		return
 	}
 	if event.Type == discordgo.InteractionMessageComponent && id == companySelectID {

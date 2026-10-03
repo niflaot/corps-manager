@@ -33,6 +33,33 @@ func (store *Store) Create(ctx context.Context, item agreements.Agreement) (agre
 	return item, nil
 }
 
+// UpdateAgreement replaces the description and image of an agreement.
+func (store *Store) UpdateAgreement(ctx context.Context, item agreements.Agreement) (agreements.Agreement, error) {
+	err := store.pool.QueryRow(ctx, `UPDATE business_agreements SET description = $3, image_url = NULLIF($4,'')
+ WHERE company_id = $1 AND agreement_id = $2
+ RETURNING created_by, created_at, (SELECT name FROM agreement_companies WHERE company_id = $1)`,
+		item.CompanyID, item.ID, item.Description, item.ImageURL).Scan(&item.CreatedBy, &item.CreatedAt, &item.CompanyName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return agreements.Agreement{}, agreements.ErrAgreementNotFound
+	}
+	if err != nil {
+		return agreements.Agreement{}, mapError(err)
+	}
+	return item, nil
+}
+
+// DeleteAgreement removes one agreement from its company.
+func (store *Store) DeleteAgreement(ctx context.Context, companyID string, id string) error {
+	result, err := store.pool.Exec(ctx, `DELETE FROM business_agreements WHERE company_id = $1 AND agreement_id = $2`, companyID, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return agreements.ErrAgreementNotFound
+	}
+	return nil
+}
+
 // List returns agreements grouped by company and identifier.
 func (store *Store) List(ctx context.Context) ([]agreements.Agreement, error) {
 	rows, err := store.pool.Query(ctx, `SELECT a.company_id, c.name, a.agreement_id, a.description,
