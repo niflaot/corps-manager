@@ -83,19 +83,18 @@ Las empresas son un catálogo dinámico, sin tres tipos fijos. Se administran me
 curl -X POST http://127.0.0.1:3100/api/companies \
   -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"id":"empresa-a","name":"Empresa A"}'
+  -d '{"id":"empresa-a","name":"Empresa A","channelId":"567890123456789012"}'
 ```
 
-`GET /api/companies` lista las empresas. `DELETE /api/companies/:id` elimina una empresa vacía; devuelve `409` si tiene convenios. El identificador de empresa es único. La creación duplicada devuelve `409` y no genera otra empresa. Estas operaciones están disponibles aunque el panel de Discord esté deshabilitado.
+Cada empresa tiene su propio canal (`channelId`) donde el bot publica el listado de sus convenios; así cada empresa muestra solo los suyos. `PUT /api/companies/:id` actualiza nombre y canal. `GET /api/companies` lista las empresas. `DELETE /api/companies/:id` elimina una empresa vacía; devuelve `409` si tiene convenios. El identificador de empresa es único. La creación duplicada devuelve `409` y no genera otra empresa. Estas operaciones están disponibles aunque el panel de Discord esté deshabilitado.
 
 ```dotenv
 DISCORD_BOT_AGREEMENTS_ENABLED=true
 DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID=456789012345678901
-DISCORD_BOT_AGREEMENTS_CHANNEL_ID=567890123456789012
 DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL=6h
 ```
 
-El canal de control conserva el panel administrado con **Añadir convenio** y **Ver convenios**. Al añadir, eliges una empresa en un selector privado paginado y completas el formulario con identificador, descripción e imagen HTTPS opcional. El catálogo admite más de 25 empresas mediante paginación.
+El canal de control conserva el panel administrado con **Añadir convenio**, **Ver convenios**, **Añadir empresa**, **Editar empresa** y **Eliminar empresa**. Las empresas (identificador, nombre y canal de convenios) se configuran ahí mismo mediante formularios, sin variable de canal global; cada cambio republica el listado de la empresa en su canal. Una empresa sin canal (creada antes de esta versión) no se publica hasta editarla. Eliminar una empresa archiva su mensaje administrado y su identificador no puede reutilizarse para publicar. Al añadir, eliges una empresa en un selector privado paginado y completas el formulario con identificador, descripción e imagen HTTPS opcional. El catálogo admite más de 25 empresas mediante paginación.
 
 El identificador del convenio es único **dentro de su empresa**: dos empresas pueden usar el mismo. La descripción admite de 3 a 1000 caracteres. El listado público muestra la empresa de cada convenio y hasta tres convenios completos para respetar los límites de Discord. La consulta privada permite recorrer todo el listado. Quienes tengan acceso al canal de control pueden registrar convenios; restringe ese canal al equipo que los administra.
 
@@ -112,7 +111,7 @@ Todas las rutas `/api` requieren `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
 | PUT | `/api/messages/:key/assignment` | Cambiar asignación |
 | POST | `/api/messages/:key/reconcile` | Pedir revisión inmediata |
 | GET / POST | `/api/companies` | Listar o crear empresas |
-| DELETE | `/api/companies/:id` | Eliminar una empresa vacía |
+| PUT / DELETE | `/api/companies/:id` | Actualizar nombre y canal, o eliminar una empresa vacía |
 
 ## Actualización desde la versión anterior
 

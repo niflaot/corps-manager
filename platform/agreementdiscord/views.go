@@ -12,7 +12,7 @@ import (
 const companyPageSize = 25
 const agreementPageSize = 3
 
-func (handler *handler) showCompanies(ctx context.Context, session *discordgo.Session, interaction *discordgo.Interaction, page int) {
+func (handler *handler) showCompanies(ctx context.Context, session *discordgo.Session, interaction *discordgo.Interaction, mode companyMode, page int) {
 	items, err := handler.service.ListCompanies(ctx)
 	if err != nil {
 		handler.log.Error("list agreement companies", zap.Error(err))
@@ -20,7 +20,7 @@ func (handler *handler) showCompanies(ctx context.Context, session *discordgo.Se
 		return
 	}
 	if len(items) == 0 {
-		handler.edit(ctx, session, interaction, "Primero crea una empresa mediante la API.", nil)
+		handler.edit(ctx, session, interaction, "Primero añade una empresa con el botón correspondiente.", nil)
 		return
 	}
 	page = min(page, (len(items)-1)/companyPageSize)
@@ -30,10 +30,10 @@ func (handler *handler) showCompanies(ctx context.Context, session *discordgo.Se
 		options = append(options, discordgo.SelectMenuOption{Label: item.Name, Value: item.ID, Description: item.ID})
 	}
 	components := []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-		discordgo.SelectMenu{CustomID: companySelectID, Placeholder: "Elige la empresa del convenio", Options: options, MaxValues: 1},
+		discordgo.SelectMenu{CustomID: mode.selectID, Placeholder: mode.placeholder, Options: options, MaxValues: 1},
 	}}}
-	components = append(components, pageButtons(companyPagePrefix, page, (len(items)-1)/companyPageSize)...)
-	handler.edit(ctx, session, interaction, fmt.Sprintf("**Empresa del convenio** · Página %d", page+1), components)
+	components = append(components, pageButtons(mode.pagePrefix, page, (len(items)-1)/companyPageSize)...)
+	handler.edit(ctx, session, interaction, fmt.Sprintf("**%s** · Página %d", mode.title, page+1), components)
 }
 
 func (handler *handler) showList(ctx context.Context, session *discordgo.Session, interaction *discordgo.Interaction, page int) {

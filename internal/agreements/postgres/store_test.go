@@ -28,7 +28,7 @@ func TestCompanyScopedAgreementsAndDeletion(t *testing.T) {
 	}
 	store := NewStore(pool)
 	for _, id := range []string{"company-a", "company-b"} {
-		if _, err := store.CreateCompany(ctx, agreements.Company{ID: id, Name: id}); err != nil {
+		if _, err := store.CreateCompany(ctx, agreements.Company{ID: id, Name: id, ChannelID: "456"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -51,6 +51,12 @@ func TestCompanyScopedAgreementsAndDeletion(t *testing.T) {
 		t.Fatalf("items=%v error=%v", items, err)
 	}
 	if err := store.DeleteCompany(ctx, "company-a"); !errors.Is(err, agreements.ErrCompanyInUse) {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateCompany(ctx, agreements.Company{ID: "company-b", Name: "Renamed", ChannelID: "789"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateCompany(ctx, agreements.Company{ID: "missing", Name: "Missing"}); !errors.Is(err, agreements.ErrCompanyNotFound) {
 		t.Fatal(err)
 	}
 	if _, err := store.CreateCompany(ctx, agreements.Company{ID: "empty", Name: "Empty company"}); err != nil {

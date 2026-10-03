@@ -55,13 +55,27 @@ func (store *Store) List(ctx context.Context) ([]agreements.Agreement, error) {
 
 // CreateCompany inserts a uniquely identified company.
 func (store *Store) CreateCompany(ctx context.Context, company agreements.Company) (agreements.Company, error) {
-	_, err := store.pool.Exec(ctx, `INSERT INTO agreement_companies (company_id,name) VALUES ($1,$2)`, company.ID, company.Name)
+	_, err := store.pool.Exec(ctx, `INSERT INTO agreement_companies (company_id,name,channel_id) VALUES ($1,$2,NULLIF($3,''))`,
+		company.ID, company.Name, company.ChannelID)
 	return company, mapError(err)
+}
+
+// UpdateCompany replaces the name and channel of an existing company.
+func (store *Store) UpdateCompany(ctx context.Context, company agreements.Company) (agreements.Company, error) {
+	result, err := store.pool.Exec(ctx, `UPDATE agreement_companies SET name = $2, channel_id = NULLIF($3,'') WHERE company_id = $1`,
+		company.ID, company.Name, company.ChannelID)
+	if err != nil {
+		return agreements.Company{}, mapError(err)
+	}
+	if result.RowsAffected() == 0 {
+		return agreements.Company{}, agreements.ErrCompanyNotFound
+	}
+	return company, nil
 }
 
 // ListCompanies returns all companies ordered by identifier.
 func (store *Store) ListCompanies(ctx context.Context) ([]agreements.Company, error) {
-	rows, err := store.pool.Query(ctx, `SELECT company_id,name FROM agreement_companies ORDER BY company_id`)
+	rows, err := store.pool.Query(ctx, `SELECT company_id,name,COALESCE(channel_id,'') FROM agreement_companies ORDER BY company_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +83,7 @@ func (store *Store) ListCompanies(ctx context.Context) ([]agreements.Company, er
 	items := make([]agreements.Company, 0)
 	for rows.Next() {
 		var item agreements.Company
-		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.ChannelID); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

@@ -21,4 +21,10 @@
         <addForeignKeyConstraint baseTableName="business_agreements" baseColumnNames="company_id" referencedTableName="agreement_companies" referencedColumnNames="company_id" constraintName="agreement_company_fk" onDelete="RESTRICT"/>
         <sql>UPDATE managed_messages SET payload = '{"components":[{"type":10,"content":"No hay convenios registrados. Abre el nuevo control para elegir una empresa."}],"allowedMentions":{"parse":[]}}'::jsonb, desired_hash = 'c8dbbcb1bf1baa64d1583c59697585411423d96c5b66aea0413c6ec751753847', revision = revision + 1, state = 'pending', next_check_at = now(), lease_owner = NULL, lease_until = NULL WHERE key IN ('business-agreements','business-agreements-control') AND state != 'archived';</sql>
     </changeSet>
+    <changeSet id="agreements-company-channels" author="corps-manager">
+        <addColumn tableName="agreement_companies">
+            <column name="channel_id" type="varchar(20)"/>
+        </addColumn>
+        <sql>ALTER TABLE agreement_companies ADD CONSTRAINT company_channel_format CHECK (channel_id IS NULL OR channel_id ~ '^[0-9]{1,20}$');</sql>
+    </changeSet>
 </databaseChangeLog>

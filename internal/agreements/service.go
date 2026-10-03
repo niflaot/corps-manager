@@ -2,11 +2,6 @@ package agreements
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -14,11 +9,11 @@ import (
 	"github.com/niflaot/corps-manager/internal/messages"
 )
 
-const publishAttempts = 3
-const createKeyPrefix = "agreement-create-"
-const replaceKeyPrefix = "agreement-replace"
+const maximumCompanyNameLength = 80
+const maximumCompanyIDLength = 60
 
 var agreementIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+var companyIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,59}$`)
 
 // Service manages agreements and their managed Discord messages.
 type Service struct {
@@ -76,47 +71,65 @@ func (service *Service) List(ctx context.Context) ([]Agreement, error) {
 	return service.repository.List(ctx)
 }
 
-// Publish creates or updates the agreement list and its control panel.
-func (service *Service) Publish(ctx context.Context) error {
-	if !service.config.Enabled {
-		return ErrDisabled
+// CreateCompany creates a company with its agreement channel and refreshes the panels.
+func (service *Service) CreateCompany(ctx context.Context, id, name, channelID string) (Company, error) {
+	company, err := validateCompany(id, name, channelID)
+	if err != nil || !companyIDPattern.MatchString(company.ID) {
+		return Company{}, ErrInvalidCompany
 	}
-	items, err := service.repository.List(ctx)
+	company, err = service.repository.CreateCompany(ctx, company)
 	if err != nil {
-		return fmt.Errorf("list agreements for panel: %w", err)
+		return Company{}, err
 	}
-	definitions, err := Render(items, service.config, service.guildID)
-	if err != nil {
-		return err
-	}
-	for _, definition := range definitions {
-		if err := service.publishDefinition(ctx, definition); err != nil {
-			return err
-		}
-	}
-	return nil
+	return company, service.refresh(ctx)
 }
 
-func (service *Service) publishDefinition(ctx context.Context, definition messages.Definition) error {
-	encoded, err := json.Marshal(definition)
+// UpdateCompany replaces a company's name and agreement channel and refreshes the panels.
+func (service *Service) UpdateCompany(ctx context.Context, id, name, channelID string) (Company, error) {
+	company, err := validateCompany(id, name, channelID)
 	if err != nil {
-		return fmt.Errorf("encode agreement panel fingerprint: %w", err)
+		return Company{}, err
 	}
-	digest := sha256.Sum256(encoded)
-	fingerprint := hex.EncodeToString(digest[:8])
-	for attempt := 0; attempt < publishAttempts; attempt++ {
-		record, getErr := service.messages.Get(ctx, definition.Key)
-		if errors.Is(getErr, messages.ErrNotFound) {
-			_, err = service.messages.Create(ctx, definition, createKeyPrefix+definition.Key+"-"+fingerprint)
-		} else if getErr == nil {
-			key := fmt.Sprintf("%s-%s-%d-%s", replaceKeyPrefix, definition.Key, record.Revision, fingerprint)
-			_, err = service.messages.Replace(ctx, record.Key, record.Revision, definition, key)
-		} else {
-			return getErr
-		}
-		if !errors.Is(err, messages.ErrConflict) {
-			return err
-		}
+	company, err = service.repository.UpdateCompany(ctx, company)
+	if err != nil {
+		return Company{}, err
 	}
-	return messages.ErrConflict
+	return company, service.refresh(ctx)
+}
+
+// ListCompanies returns the configured companies independently of Discord publishing.
+func (service *Service) ListCompanies(ctx context.Context) ([]Company, error) {
+	return service.repository.ListCompanies(ctx)
+}
+
+// DeleteCompany removes an empty company, archives its list message and refreshes the panels.
+func (service *Service) DeleteCompany(ctx context.Context, id string) error {
+	if !agreementIDPattern.MatchString(id) {
+		return ErrInvalidCompany
+	}
+	if err := service.repository.DeleteCompany(ctx, id); err != nil {
+		return err
+	}
+	if !service.config.Enabled {
+		return nil
+	}
+	return service.archive(ctx, companyMessageKey(id))
+}
+
+func (service *Service) refresh(ctx context.Context) error {
+	if !service.config.Enabled {
+		return nil
+	}
+	return service.Publish(ctx)
+}
+
+func validateCompany(id, name, channelID string) (Company, error) {
+	company := Company{ID: strings.TrimSpace(id), Name: strings.TrimSpace(name), ChannelID: strings.TrimSpace(channelID)}
+	valid := agreementIDPattern.MatchString(company.ID) && len([]rune(company.Name)) >= 2 &&
+		len([]rune(company.Name)) <= maximumCompanyNameLength &&
+		snowflakePattern.MatchString(company.ChannelID)
+	if !valid {
+		return Company{}, ErrInvalidCompany
+	}
+	return company, nil
 }

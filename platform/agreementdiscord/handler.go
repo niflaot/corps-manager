@@ -39,6 +39,9 @@ func (handler *handler) handle(session *discordgo.Session, event *discordgo.Inte
 	id := customID(event)
 	ctx, cancel := context.WithTimeout(handler.ctx, interactionTimeout)
 	defer cancel()
+	if handler.handleCompany(ctx, session, event, id) {
+		return
+	}
 	if event.Type == discordgo.InteractionMessageComponent && id == companySelectID {
 		values := event.MessageComponentData().Values
 		if len(values) == 1 {
@@ -58,12 +61,12 @@ func (handler *handler) handle(session *discordgo.Session, event *discordgo.Inte
 	switch {
 	case id == agreements.ButtonAddCustomID:
 		if handler.deferResponse(ctx, session, event.Interaction) {
-			handler.showCompanies(ctx, session, event.Interaction, 0)
+			handler.showCompanies(ctx, session, event.Interaction, agreementMode, 0)
 		}
 	case strings.HasPrefix(id, companyPagePrefix):
 		page, err := strconv.Atoi(strings.TrimPrefix(id, companyPagePrefix))
 		if err == nil && page >= 0 && handler.deferResponse(ctx, session, event.Interaction) {
-			handler.showCompanies(ctx, session, event.Interaction, page)
+			handler.showCompanies(ctx, session, event.Interaction, agreementMode, page)
 		}
 	case id == agreements.ButtonListCustomID:
 		if handler.deferResponse(ctx, session, event.Interaction) {

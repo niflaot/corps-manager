@@ -61,11 +61,22 @@ func registerCompanyRoutes(router fiber.Router, service CompanyService) {
 		if err := decodeStrict(ctx.Body(), &request); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
-		company, err := service.CreateCompany(ctx.UserContext(), request.ID, request.Name)
+		company, err := service.CreateCompany(ctx.UserContext(), request.ID, request.Name, request.ChannelID)
 		if err != nil {
 			return companyError(err)
 		}
 		return ctx.Status(fiber.StatusCreated).JSON(company)
+	})
+	router.Put("/:id", func(ctx *fiber.Ctx) error {
+		var request agreements.Company
+		if err := decodeStrict(ctx.Body(), &request); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+		company, err := service.UpdateCompany(ctx.UserContext(), ctx.Params("id"), request.Name, request.ChannelID)
+		if err != nil {
+			return companyError(err)
+		}
+		return ctx.JSON(company)
 	})
 	router.Delete("/:id", func(ctx *fiber.Ctx) error {
 		if err := service.DeleteCompany(ctx.UserContext(), ctx.Params("id")); err != nil {

@@ -46,7 +46,7 @@ func TestCompanySelectorPaginatesBeyondDiscordLimit(t *testing.T) {
 	})}
 	interaction := &discordgo.Interaction{ID: "111", AppID: "222", Token: "token"}
 	for page, want := range []int{25, 5} {
-		handler.showCompanies(context.Background(), session, interaction, page)
+		handler.showCompanies(context.Background(), session, interaction, agreementMode, page)
 		var rows []struct {
 			Components []struct {
 				Options []discordgo.SelectMenuOption `json:"options"`

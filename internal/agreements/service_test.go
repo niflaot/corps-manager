@@ -7,30 +7,41 @@ import (
 	"testing"
 )
 
-func TestRenderProducesValidManagedMessages(t *testing.T) {
+func TestRenderProducesOneListPerCompanyWithChannel(t *testing.T) {
 	t.Parallel()
-	definitions, err := Render([]Agreement{{ID: "lspd", Description: "Descuento para sus integrantes.",
-		ImageURL: "https://example.com/lspd.png"}}, Config{ChannelID: "123456789012345678",
-		ControlChannelID: "234567890123456789"}, "987654321098765432")
+	companies := []Company{{ID: "rage", Name: "Rage", ChannelID: "111"}, {ID: "lnt", Name: "LNT", ChannelID: "222"},
+		{ID: "legacy", Name: "Legacy"}}
+	items := []Agreement{{CompanyID: "rage", ID: "lspd", Description: "Descuento para sus integrantes.",
+		ImageURL: "https://example.com/lspd.png"}, {CompanyID: "lnt", ID: "otro", Description: "Otro convenio."}}
+	definitions, err := Render(companies, items, Config{ControlChannelID: "333"}, "987654321098765432")
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
-	if len(definitions) != 2 {
-		t.Fatalf("len(definitions) = %d, want 2", len(definitions))
+	if len(definitions) != 3 {
+		t.Fatalf("len(definitions) = %d, want 3", len(definitions))
 	}
+	channels := map[string]string{}
 	for _, definition := range definitions {
 		if err := definition.Validate(); err != nil {
 			t.Fatalf("definition %q Validate: %v", definition.Key, err)
 		}
+		channels[definition.Key] = definition.ChannelID
+	}
+	if channels["agr-rage"] != "111" || channels["agr-lnt"] != "222" || channels[agreementsControlMessageKey] != "333" {
+		t.Fatalf("channels = %v", channels)
 	}
 }
 
 func TestMaximumAgreementDescriptionsFitDiscord(t *testing.T) {
 	items := make([]Agreement, 20)
 	for index := range items {
-		items[index] = Agreement{CompanyID: "company", CompanyName: strings.Repeat("A", 80), ID: strings.Repeat("b", 64), Description: strings.Repeat("D", 1000)}
+		items[index] = Agreement{CompanyID: "company", ID: strings.Repeat("b", 64), Description: strings.Repeat("D", 1000)}
 	}
-	definitions, err := Render(items, Config{ChannelID: "123", ControlChannelID: "456"}, "789")
+	company := Company{ID: strings.Repeat("c", 60), Name: strings.Repeat("A", 80), ChannelID: "123"}
+	for index := range items {
+		items[index].CompanyID = company.ID
+	}
+	definitions, err := Render([]Company{company}, items, Config{ControlChannelID: "456"}, "789")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,9 +55,15 @@ func TestMaximumAgreementDescriptionsFitDiscord(t *testing.T) {
 func TestInvalidCompanyAndAgreementInputs(t *testing.T) {
 	service := NewService(Config{Enabled: true}, nil, nil, "123")
 	for _, item := range [][2]string{{"", "Valid company"}, {"UPPERCASE", "Valid company"}, {"company", ""}, {"company", strings.Repeat("x", 81)}} {
-		if _, err := service.CreateCompany(context.Background(), item[0], item[1]); !errors.Is(err, ErrInvalidCompany) {
+		if _, err := service.CreateCompany(context.Background(), item[0], item[1], "123"); !errors.Is(err, ErrInvalidCompany) {
 			t.Fatalf("accepted invalid company: %v", err)
 		}
+	}
+	if _, err := service.CreateCompany(context.Background(), "company", "Valid company", "not-a-channel"); !errors.Is(err, ErrInvalidCompany) {
+		t.Fatalf("accepted invalid channel: %v", err)
+	}
+	if _, err := service.CreateCompany(context.Background(), strings.Repeat("c", 61), "Valid company", "123"); !errors.Is(err, ErrInvalidCompany) {
+		t.Fatalf("accepted oversized company id: %v", err)
 	}
 	if _, err := service.Create(context.Background(), "missing space", "id", "Description", "", "123"); !errors.Is(err, ErrInvalidCompany) {
 		t.Fatal(err)

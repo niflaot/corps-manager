@@ -18,10 +18,13 @@ type companyStub struct {
 	deleted string
 }
 
-func (stub *companyStub) CreateCompany(_ context.Context, id, name string) (agreements.Company, error) {
-	item := agreements.Company{ID: id, Name: name}
+func (stub *companyStub) CreateCompany(_ context.Context, id, name, channelID string) (agreements.Company, error) {
+	item := agreements.Company{ID: id, Name: name, ChannelID: channelID}
 	stub.items = append(stub.items, item)
 	return item, stub.err
+}
+func (stub *companyStub) UpdateCompany(_ context.Context, id, name, channelID string) (agreements.Company, error) {
+	return agreements.Company{ID: id, Name: name, ChannelID: channelID}, stub.err
 }
 func (stub *companyStub) ListCompanies(context.Context) ([]agreements.Company, error) {
 	return stub.items, stub.err
@@ -59,6 +62,14 @@ func TestCompanyAPIAuthenticationAndMutations(t *testing.T) {
 	response.Body.Close()
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("unknown JSON field accepted: %d", response.StatusCode)
+	}
+	response, err = app.Test(authenticatedRequest(http.MethodPut, "/api/companies/company-a", `{"id":"company-a","name":"Nueva","channelId":"123"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("company update: %d", response.StatusCode)
 	}
 	stub.err = agreements.ErrCompanyInUse
 	response, err = app.Test(authenticatedRequest(http.MethodDelete, "/api/companies/company-a", ""))

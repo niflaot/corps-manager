@@ -50,12 +50,16 @@ type Company struct {
 	ID string `json:"id"`
 	// Name is the display name shown in Discord forms.
 	Name string `json:"name"`
+	// ChannelID is the Discord channel receiving this company's agreement list; legacy companies may lack one and are not published.
+	ChannelID string `json:"channelId,omitempty"`
 }
 
 // Repository persists business agreements.
 type Repository interface {
 	// CreateCompany creates a uniquely identified company.
 	CreateCompany(context.Context, Company) (Company, error)
+	// UpdateCompany replaces a company's name and channel.
+	UpdateCompany(context.Context, Company) (Company, error)
 	// ListCompanies returns all companies ordered by ID.
 	ListCompanies(context.Context) ([]Company, error)
 	// DeleteCompany deletes a company only when it has no agreements.

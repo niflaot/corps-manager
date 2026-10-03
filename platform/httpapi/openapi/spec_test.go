@@ -12,6 +12,7 @@ type testOperation struct {
 type testPathItem struct {
 	Get    testOperation `json:"get"`
 	Post   testOperation `json:"post"`
+	Put    testOperation `json:"put"`
 	Delete testOperation `json:"delete"`
 }
 
@@ -29,7 +30,7 @@ func TestSpecProtectsPrivateOperations(t *testing.T) {
 	if err := json.Unmarshal([]byte(Spec), &document); err != nil {
 		t.Fatalf("Spec is invalid JSON: %v", err)
 	}
-	privateOperations := [][2]string{{"/api/companies", "get"}, {"/api/companies", "post"}, {"/api/companies/{id}", "delete"}, {"/api/messages", "get"}, {"/api/messages", "post"}}
+	privateOperations := [][2]string{{"/api/companies", "get"}, {"/api/companies", "post"}, {"/api/companies/{id}", "put"}, {"/api/companies/{id}", "delete"}, {"/api/messages", "get"}, {"/api/messages", "post"}}
 	for _, operation := range privateOperations {
 		if len(selectOperation(document.Paths[operation[0]], operation[1]).Security) == 0 {
 			t.Fatalf("private operation %s %s does not require API authentication", operation[1], operation[0])
@@ -41,6 +42,8 @@ func selectOperation(path testPathItem, method string) testOperation {
 	switch method {
 	case "post":
 		return path.Post
+	case "put":
+		return path.Put
 	case "delete":
 		return path.Delete
 	default:

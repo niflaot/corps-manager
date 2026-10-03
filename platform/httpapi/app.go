@@ -31,8 +31,10 @@ type MessageService interface {
 
 // CompanyService contains HTTP-facing agreement company operations.
 type CompanyService interface {
-	// CreateCompany creates a company available in Discord forms.
-	CreateCompany(context.Context, string, string) (agreements.Company, error)
+	// CreateCompany creates a company with its agreement channel.
+	CreateCompany(context.Context, string, string, string) (agreements.Company, error)
+	// UpdateCompany replaces a company's name and agreement channel.
+	UpdateCompany(context.Context, string, string, string) (agreements.Company, error)
 	// ListCompanies returns companies in identifier order.
 	ListCompanies(context.Context) ([]agreements.Company, error)
 	// DeleteCompany deletes an empty company.

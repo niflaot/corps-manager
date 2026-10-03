@@ -18,8 +18,6 @@ var snowflakePattern = regexp.MustCompile(`^[0-9]{1,20}$`)
 type Config struct {
 	// Enabled activates agreement interactions and publishing; disabled by default.
 	Enabled bool `env:"DISCORD_BOT_AGREEMENTS_ENABLED"`
-	// ChannelID selects the public agreements-list channel.
-	ChannelID string `env:"DISCORD_BOT_AGREEMENTS_CHANNEL_ID"`
 	// ControlChannelID selects the channel containing the add button.
 	ControlChannelID string `env:"DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID"`
 	// RefreshInterval defaults to six hours between panel refreshes.
@@ -32,13 +30,9 @@ func LoadConfig() (Config, error) {
 	if err := env.Parse(&config); err != nil {
 		return Config{}, err
 	}
-	config.ChannelID = strings.TrimSpace(config.ChannelID)
 	config.ControlChannelID = strings.TrimSpace(config.ControlChannelID)
 	if config.RefreshInterval <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL must be positive")
-	}
-	if config.Enabled && !snowflakePattern.MatchString(config.ChannelID) {
-		return Config{}, fmt.Errorf("DISCORD_BOT_AGREEMENTS_CHANNEL_ID must be a Discord snowflake")
 	}
 	if config.Enabled && !snowflakePattern.MatchString(config.ControlChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID must be a Discord snowflake")

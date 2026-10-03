@@ -8,11 +8,19 @@ import (
 )
 
 const (
-	agreementsListMessageKey    = "business-agreements"
+	legacyListMessageKey        = "business-agreements"
+	companyMessageKeyPrefix     = "agr-"
+	maximumPublicAgreements     = 3
 	agreementsControlMessageKey = "business-agreements-control"
 	agreementsAccent            = 0x9b59b6
 	// ButtonAddCustomID identifies the add-agreement action.
 	ButtonAddCustomID = "agreements:add"
+	// ButtonCompanyAddCustomID identifies the add-company action.
+	ButtonCompanyAddCustomID = "agreements:company-add"
+	// ButtonCompanyEditCustomID identifies the edit-company action.
+	ButtonCompanyEditCustomID = "agreements:company-edit"
+	// ButtonCompanyDeleteCustomID identifies the delete-company action.
+	ButtonCompanyDeleteCustomID = "agreements:company-delete"
 	// ButtonListCustomID identifies the private complete list action.
 	ButtonListCustomID = "agreements:list"
 )
@@ -35,43 +43,64 @@ type media struct {
 	URL string `json:"url"`
 }
 
-// Render creates the public agreement list and dedicated control panel.
-func Render(items []Agreement, config Config, guildID string) ([]messages.Definition, error) {
-	listChildren := []component{{Type: 10, Content: "# 🤝 Convenios"},
-		{Type: 10, Content: fmt.Sprintf("**Convenios activos:** %d", len(items))},
-		{Type: 14, Divider: true, Spacing: 1}}
-	if len(items) == 0 {
-		listChildren = append(listChildren, component{Type: 10, Content: "Aún no hay convenios registrados."})
+// Render creates one public agreement list per company with a channel and the shared control panel.
+func Render(companies []Company, items []Agreement, config Config, guildID string) ([]messages.Definition, error) {
+	byCompany := make(map[string][]Agreement, len(companies))
+	for _, item := range items {
+		byCompany[item.CompanyID] = append(byCompany[item.CompanyID], item)
 	}
-	for _, item := range items[:min(len(items), 3)] {
-		content := fmt.Sprintf("## %s · `%s`\n%s", item.CompanyName, item.ID, item.Description)
-		if item.ImageURL == "" {
-			listChildren = append(listChildren, component{Type: 10, Content: content})
-		} else {
-			listChildren = append(listChildren, component{Type: 9,
-				Components: []component{{Type: 10, Content: content}},
-				Accessory:  &component{Type: 11, Media: &media{URL: item.ImageURL}}})
+	definitions := make([]messages.Definition, 0, len(companies)+1)
+	for _, company := range companies {
+		if company.ChannelID == "" || len(company.ID) > maximumCompanyIDLength {
+			continue
 		}
-	}
-	if len(items) > 3 {
-		listChildren = append(listChildren, component{Type: 10,
-			Content: fmt.Sprintf("Y **%d** convenios más.", len(items)-3)})
+		list, err := definition(companyMessageKey(company.ID), company.ChannelID, guildID,
+			listChildren(company, byCompany[company.ID]))
+		if err != nil {
+			return nil, err
+		}
+		definitions = append(definitions, list)
 	}
 	controlChildren := []component{{Type: 10, Content: "# 🤝 Administración de convenios"},
-		{Type: 10, Content: "Elige una empresa y añade su convenio. La imagen es opcional."},
+		{Type: 10, Content: "Gestiona las empresas, el canal de cada una y sus convenios. La imagen es opcional."},
 		{Type: 14, Divider: true, Spacing: 1}, {Type: 1, Components: []component{
 			{Type: 2, Style: 3, Label: "Añadir convenio", CustomID: ButtonAddCustomID},
 			{Type: 2, Style: 1, Label: "Ver convenios", CustomID: ButtonListCustomID},
+		}}, {Type: 1, Components: []component{
+			{Type: 2, Style: 3, Label: "Añadir empresa", CustomID: ButtonCompanyAddCustomID},
+			{Type: 2, Style: 2, Label: "Editar empresa", CustomID: ButtonCompanyEditCustomID},
+			{Type: 2, Style: 4, Label: "Eliminar empresa", CustomID: ButtonCompanyDeleteCustomID},
 		}}}
-	list, err := definition(agreementsListMessageKey, config.ChannelID, guildID, listChildren)
-	if err != nil {
-		return nil, err
-	}
 	control, err := definition(agreementsControlMessageKey, config.ControlChannelID, guildID, controlChildren)
 	if err != nil {
 		return nil, err
 	}
-	return []messages.Definition{list, control}, nil
+	return append(definitions, control), nil
+}
+
+func companyMessageKey(companyID string) string { return companyMessageKeyPrefix + companyID }
+
+func listChildren(company Company, items []Agreement) []component {
+	children := []component{{Type: 10, Content: "# 🤝 Convenios · " + company.Name},
+		{Type: 10, Content: fmt.Sprintf("**Convenios activos:** %d", len(items))},
+		{Type: 14, Divider: true, Spacing: 1}}
+	if len(items) == 0 {
+		children = append(children, component{Type: 10, Content: "Aún no hay convenios registrados."})
+	}
+	for _, item := range items[:min(len(items), maximumPublicAgreements)] {
+		content := fmt.Sprintf("## `%s`\n%s", item.ID, item.Description)
+		if item.ImageURL == "" {
+			children = append(children, component{Type: 10, Content: content})
+		} else {
+			children = append(children, component{Type: 9, Components: []component{{Type: 10, Content: content}},
+				Accessory: &component{Type: 11, Media: &media{URL: item.ImageURL}}})
+		}
+	}
+	if len(items) > maximumPublicAgreements {
+		children = append(children, component{Type: 10,
+			Content: fmt.Sprintf("Y **%d** convenios más.", len(items)-maximumPublicAgreements)})
+	}
+	return children
 }
 
 func definition(key string, channelID string, guildID string, children []component) (messages.Definition, error) {
