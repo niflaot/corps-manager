@@ -35,7 +35,7 @@ type media struct {
 	URL string `json:"url"`
 }
 
-// Render creates the public agreement list and performance-channel control panel.
+// Render creates the public agreement list and dedicated control panel.
 func Render(items []Agreement, config Config, guildID string) ([]messages.Definition, error) {
 	listChildren := []component{{Type: 10, Content: "# 🤝 Convenios"},
 		{Type: 10, Content: fmt.Sprintf("**Convenios activos:** %d", len(items))},
@@ -43,8 +43,8 @@ func Render(items []Agreement, config Config, guildID string) ([]messages.Defini
 	if len(items) == 0 {
 		listChildren = append(listChildren, component{Type: 10, Content: "Aún no hay convenios registrados."})
 	}
-	for _, item := range items[:min(len(items), 10)] {
-		content := fmt.Sprintf("## `%s`\n%s", item.ID, item.Description)
+	for _, item := range items[:min(len(items), 3)] {
+		content := fmt.Sprintf("## %s · `%s`\n%s", item.CompanyName, item.ID, item.Description)
 		if item.ImageURL == "" {
 			listChildren = append(listChildren, component{Type: 10, Content: content})
 		} else {
@@ -53,12 +53,12 @@ func Render(items []Agreement, config Config, guildID string) ([]messages.Defini
 				Accessory:  &component{Type: 11, Media: &media{URL: item.ImageURL}}})
 		}
 	}
-	if len(items) > 10 {
+	if len(items) > 3 {
 		listChildren = append(listChildren, component{Type: 10,
-			Content: fmt.Sprintf("Y **%d** convenios más.", len(items)-10)})
+			Content: fmt.Sprintf("Y **%d** convenios más.", len(items)-3)})
 	}
 	controlChildren := []component{{Type: 10, Content: "# 🤝 Administración de convenios"},
-		{Type: 10, Content: "Añade un convenio al listado público. La imagen es opcional."},
+		{Type: 10, Content: "Elige una empresa y añade su convenio. La imagen es opcional."},
 		{Type: 14, Divider: true, Spacing: 1}, {Type: 1, Components: []component{
 			{Type: 2, Style: 3, Label: "Añadir convenio", CustomID: ButtonAddCustomID},
 			{Type: 2, Style: 1, Label: "Ver convenios", CustomID: ButtonListCustomID},

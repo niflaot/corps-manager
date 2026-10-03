@@ -4,9 +4,7 @@ import (
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/niflaot/corps-manager/internal/announcements"
-	"github.com/niflaot/corps-manager/internal/inactivity"
-	"github.com/niflaot/corps-manager/internal/performance"
+	"github.com/niflaot/corps-manager/internal/agreements"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/health"
 	"github.com/niflaot/corps-manager/platform/httpapi/openapi"
@@ -14,91 +12,18 @@ import (
 
 func registerRoutes(application *fiber.App, config appconfig.Config, apiConfig Config, healthService *health.Service, dependencies Dependencies, version string) {
 	application.Get("/status", func(ctx *fiber.Ctx) error {
-		return ctx.JSON(StatusResponse{
-			Status:       "ok",
-			Environment:  config.Environment,
-			Version:      version,
-			Dependencies: healthService.Snapshot(ctx.UserContext()),
-		})
+		return ctx.JSON(StatusResponse{Status: "ok", Environment: config.Environment, Version: version, Dependencies: healthService.Snapshot(ctx.UserContext())})
 	})
-	if dependencies.CustomerPage != nil {
-		application.Get("/customers", dependencies.CustomerPage)
-	}
 	if config.Environment.IsDevelopment() {
 		registerDocumentationRoutes(application)
 	}
 	if dependencies.Messages != nil {
 		registerMessageRoutes(application.Group("/api/messages", authenticate(apiConfig.APIKey)), dependencies.Messages)
 	}
-	if dependencies.Performance != nil {
-		registerPerformanceRoutes(application.Group("/api/performance", authenticate(apiConfig.APIKey)), dependencies.Performance)
+	if dependencies.Companies != nil {
+		registerCompanyRoutes(application.Group("/api/companies", authenticate(apiConfig.APIKey)), dependencies.Companies)
 	}
-	if dependencies.Inactivity != nil {
-		registerInactivityRoutes(application.Group("/api/inactivity", authenticate(apiConfig.APIKey)), dependencies.Inactivity)
-	}
-	if dependencies.Announcements != nil {
-		registerAnnouncementRoutes(application.Group("/api/announcements", authenticate(apiConfig.APIKey)),
-			dependencies.Announcements)
-	}
-	application.Use(func(*fiber.Ctx) error {
-		return fiber.NewError(fiber.StatusNotFound, "route not found")
-	})
-}
-
-func registerAnnouncementRoutes(router fiber.Router, service AnnouncementService) {
-	router.Post("/opening", func(ctx *fiber.Ctx) error {
-		var request OpeningAnnouncementRequest
-		if len(ctx.Body()) > 0 {
-			if err := ctx.BodyParser(&request); err != nil {
-				return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
-			}
-		}
-		state, err := service.AnnounceOpening(ctx.UserContext(), request.Actor)
-		if err != nil {
-			return announcementError(err)
-		}
-		return ctx.Status(fiber.StatusCreated).JSON(state)
-	})
-	router.Get("/opening/cooldown", func(ctx *fiber.Ctx) error {
-		state, err := service.GetCooldown(ctx.UserContext())
-		if err != nil {
-			return announcementError(err)
-		}
-		return ctx.JSON(state)
-	})
-	router.Delete("/opening/cooldown", func(ctx *fiber.Ctx) error {
-		if err := service.ClearCooldown(ctx.UserContext()); err != nil {
-			return announcementError(err)
-		}
-		return ctx.SendStatus(fiber.StatusNoContent)
-	})
-}
-
-func registerInactivityRoutes(router fiber.Router, service InactivityService) {
-	router.Get("/", func(ctx *fiber.Ctx) error {
-		entries, err := service.List(ctx.UserContext())
-		if err != nil {
-			return inactivityError(err)
-		}
-		return ctx.JSON(fiber.Map{"items": entries, "total": len(entries)})
-	})
-	router.Post("/", func(ctx *fiber.Ctx) error {
-		var request InactivityMutationRequest
-		if err := ctx.BodyParser(&request); err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
-		}
-		entry, err := service.Add(ctx.UserContext(), request.Name, "api")
-		if err != nil {
-			return inactivityError(err)
-		}
-		return ctx.Status(fiber.StatusCreated).JSON(entry)
-	})
-	router.Delete("/:name", func(ctx *fiber.Ctx) error {
-		if err := service.Remove(ctx.UserContext(), ctx.Params("name")); err != nil {
-			return inactivityError(err)
-		}
-		return ctx.SendStatus(fiber.StatusNoContent)
-	})
+	application.Use(func(*fiber.Ctx) error { return fiber.NewError(fiber.StatusNotFound, "route not found") })
 }
 
 func registerDocumentationRoutes(application *fiber.App) {
@@ -123,75 +48,42 @@ func registerDocumentationRoutes(application *fiber.App) {
 	})
 }
 
-func registerPerformanceRoutes(router fiber.Router, service PerformanceService) {
+func registerCompanyRoutes(router fiber.Router, service CompanyService) {
 	router.Get("/", func(ctx *fiber.Ctx) error {
-		state, err := service.Get(ctx.UserContext())
+		items, err := service.ListCompanies(ctx.UserContext())
 		if err != nil {
-			return performanceError(err)
+			return companyError(err)
 		}
-		return ctx.JSON(state)
+		return ctx.JSON(fiber.Map{"items": items, "total": len(items)})
 	})
-	router.Post("/refresh", func(ctx *fiber.Ctx) error {
-		state, err := service.Refresh(ctx.UserContext())
-		if err != nil {
-			return performanceError(err)
+	router.Post("/", func(ctx *fiber.Ctx) error {
+		var request agreements.Company
+		if err := decodeStrict(ctx.Body(), &request); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
-		return ctx.JSON(state)
+		company, err := service.CreateCompany(ctx.UserContext(), request.ID, request.Name)
+		if err != nil {
+			return companyError(err)
+		}
+		return ctx.Status(fiber.StatusCreated).JSON(company)
 	})
-	router.Post("/current-period/backfill", func(ctx *fiber.Ctx) error {
-		var request performance.CurrentPeriodBackfill
-		if err := ctx.BodyParser(&request); err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "invalid JSON body")
+	router.Delete("/:id", func(ctx *fiber.Ctx) error {
+		if err := service.DeleteCompany(ctx.UserContext(), ctx.Params("id")); err != nil {
+			return companyError(err)
 		}
-		state, err := service.BackfillCurrentPeriod(ctx.UserContext(), request)
-		if err != nil {
-			return performanceError(err)
-		}
-		return ctx.JSON(state)
+		return ctx.SendStatus(fiber.StatusNoContent)
 	})
 }
 
-func performanceError(err error) error {
+func companyError(err error) error {
 	switch {
-	case errors.Is(err, performance.ErrNotFound):
+	case errors.Is(err, agreements.ErrInvalidCompany):
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	case errors.Is(err, agreements.ErrCompanyNotFound):
 		return fiber.NewError(fiber.StatusNotFound, err.Error())
-	case errors.Is(err, performance.ErrConflict):
+	case errors.Is(err, agreements.ErrAlreadyExists), errors.Is(err, agreements.ErrCompanyInUse):
 		return fiber.NewError(fiber.StatusConflict, err.Error())
-	case errors.Is(err, performance.ErrDisabled):
-		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, performance.ErrInvalidBackfill):
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	default:
-		return fiber.NewError(fiber.StatusBadGateway, "performance refresh failed")
-	}
-}
-
-func inactivityError(err error) error {
-	switch {
-	case errors.Is(err, inactivity.ErrInvalidName):
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	case errors.Is(err, inactivity.ErrAlreadyExists):
-		return fiber.NewError(fiber.StatusConflict, err.Error())
-	case errors.Is(err, inactivity.ErrNotFound):
-		return fiber.NewError(fiber.StatusNotFound, err.Error())
-	case errors.Is(err, inactivity.ErrDisabled):
-		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
-	default:
-		return fiber.NewError(fiber.StatusInternalServerError, "inactivity registry operation failed")
-	}
-}
-
-func announcementError(err error) error {
-	switch {
-	case errors.Is(err, announcements.ErrInvalidActor):
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	case errors.Is(err, announcements.ErrNotFound):
-		return fiber.NewError(fiber.StatusNotFound, err.Error())
-	case errors.Is(err, announcements.ErrCooldownActive):
-		return fiber.NewError(fiber.StatusTooManyRequests, err.Error())
-	case errors.Is(err, announcements.ErrDisabled):
-		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
-	default:
-		return fiber.NewError(fiber.StatusBadGateway, "opening announcement failed")
+		return fiber.NewError(fiber.StatusInternalServerError, "company operation failed")
 	}
 }

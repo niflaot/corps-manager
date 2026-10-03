@@ -6,11 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/niflaot/corps-manager/internal/inactivity"
 	"github.com/niflaot/corps-manager/internal/messages"
 	"go.uber.org/zap"
 )
@@ -67,65 +65,6 @@ func TestMessageGatewayBlocksAmbiguousCreate(t *testing.T) {
 	_, err := gateway.Create(context.Background(), messages.CreateRequest{ChannelID: "456", Nonce: "stable", Payload: v2Payload()})
 	if !errors.Is(err, messages.ErrAmbiguousCreate) {
 		t.Fatalf("Create() error = %v", err)
-	}
-}
-
-func TestInactivityInteractionHelpers(t *testing.T) {
-	data := discordgo.ModalSubmitInteractionData{Components: []discordgo.MessageComponent{
-		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.TextInput{CustomID: inactivityNameInputID, Value: "Thomas_Jhonson"},
-		}},
-	}}
-	if value := modalInput(data, inactivityNameInputID); value != "Thomas_Jhonson" {
-		t.Fatalf("modalInput() = %q", value)
-	}
-	manager := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{
-		Member: &discordgo.Member{Permissions: discordgo.PermissionManageMessages},
-	}}
-	if !canManageRegistry(manager) || canManageRegistry(&discordgo.InteractionCreate{Interaction: &discordgo.Interaction{}}) {
-		t.Fatal("inactivity registry permission check is incorrect")
-	}
-	page, update, ok := inactivityListPage(inactivityListPrefix + "2")
-	if !ok || !update || page != 2 {
-		t.Fatalf("inactivityListPage() = %d, %t, %t", page, update, ok)
-	}
-	content := renderInactivityList([]inactivity.Entry{{Name: "Thomas_Jhonson"}}, 21, 1, 2)
-	if !strings.Contains(content, "Thomas_Jhonson") || !strings.Contains(content, "Página 2/2") {
-		t.Fatalf("renderInactivityList() = %q", content)
-	}
-	if buttons := inactivityListButtons(0, 1); len(buttons) != 0 {
-		t.Fatalf("single-page controls = %#v", buttons)
-	}
-}
-
-func TestOpeningAnnouncementMentionsEveryoneAndAttributesActor(t *testing.T) {
-	payload := openingAnnouncement("Thomas J.")
-	if payload.Content != "@everyone" || len(payload.Embeds) != 1 || payload.Embeds[0].Title != openingTitle ||
-		payload.Embeds[0].Thumbnail == nil || payload.Embeds[0].Thumbnail.URL != openingThumbnailURL ||
-		payload.Embeds[0].Footer == nil || payload.Embeds[0].Footer.Text != "Anunciado por: Thomas J." ||
-		payload.AllowedMentions == nil || len(payload.AllowedMentions.Parse) != 1 ||
-		payload.AllowedMentions.Parse[0] != discordgo.AllowedMentionTypeEveryone {
-		t.Fatalf("openingAnnouncement() = %#v", payload)
-	}
-	event := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{Member: &discordgo.Member{
-		Nick: "Thomas J.", User: &discordgo.User{Username: "fallback"},
-	}}}
-	if actor := interactionActor(event); actor != "Thomas J." {
-		t.Fatalf("interactionActor() = %q", actor)
-	}
-}
-
-func TestInactivityInteractionsUseSeparateControlChannel(t *testing.T) {
-	handler := &inactivityInteractionHandler{config: inactivity.Config{
-		ChannelID: "performance", AnnouncementControlChannelID: "opening-control",
-	}}
-	if !handler.acceptsChannel(inactivity.ButtonAddCustomID, "performance") ||
-		handler.acceptsChannel(inactivity.ButtonAddCustomID, "opening-control") {
-		t.Fatal("employee controls are not restricted to the performance channel")
-	}
-	if !handler.acceptsChannel(inactivity.ButtonOpeningCustomID, "opening-control") ||
-		handler.acceptsChannel(inactivity.ButtonOpeningCustomID, "performance") {
-		t.Fatal("opening control is not restricted to its configured channel")
 	}
 }
 

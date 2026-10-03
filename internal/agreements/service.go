@@ -15,6 +15,8 @@ import (
 )
 
 const publishAttempts = 3
+const createKeyPrefix = "agreement-create-"
+const replaceKeyPrefix = "agreement-replace"
 
 var agreementIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
@@ -32,10 +34,14 @@ func NewService(config Config, repository Repository, messageService *messages.S
 }
 
 // Create validates and persists one agreement.
-func (service *Service) Create(ctx context.Context, id string, description string, imageURL string,
+func (service *Service) Create(ctx context.Context, companyID string, id string, description string, imageURL string,
 	actor string) (Agreement, error) {
 	if !service.config.Enabled {
 		return Agreement{}, ErrDisabled
+	}
+	companyID = strings.TrimSpace(companyID)
+	if !agreementIDPattern.MatchString(companyID) {
+		return Agreement{}, ErrInvalidCompany
 	}
 	id = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), " ", "_"))
 	description, imageURL, actor = strings.TrimSpace(description), strings.TrimSpace(imageURL), strings.TrimSpace(actor)
@@ -54,7 +60,7 @@ func (service *Service) Create(ctx context.Context, id string, description strin
 	if !snowflakePattern.MatchString(actor) {
 		return Agreement{}, ErrInvalidID
 	}
-	agreement, err := service.repository.Create(ctx, Agreement{ID: id, Description: description,
+	agreement, err := service.repository.Create(ctx, Agreement{CompanyID: companyID, ID: id, Description: description,
 		ImageURL: imageURL, CreatedBy: actor})
 	if err != nil {
 		return Agreement{}, err
@@ -101,9 +107,9 @@ func (service *Service) publishDefinition(ctx context.Context, definition messag
 	for attempt := 0; attempt < publishAttempts; attempt++ {
 		record, getErr := service.messages.Get(ctx, definition.Key)
 		if errors.Is(getErr, messages.ErrNotFound) {
-			_, err = service.messages.Create(ctx, definition, "agreement-create-"+definition.Key+"-"+fingerprint)
+			_, err = service.messages.Create(ctx, definition, createKeyPrefix+definition.Key+"-"+fingerprint)
 		} else if getErr == nil {
-			key := fmt.Sprintf("agreement-replace-%s-%d-%s", definition.Key, record.Revision, fingerprint)
+			key := fmt.Sprintf("%s-%s-%d-%s", replaceKeyPrefix, definition.Key, record.Revision, fingerprint)
 			_, err = service.messages.Replace(ctx, record.Key, record.Revision, definition, key)
 		} else {
 			return getErr

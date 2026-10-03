@@ -1,6 +1,11 @@
 package agreements
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+)
 
 func TestRenderProducesValidManagedMessages(t *testing.T) {
 	t.Parallel()
@@ -17,5 +22,36 @@ func TestRenderProducesValidManagedMessages(t *testing.T) {
 		if err := definition.Validate(); err != nil {
 			t.Fatalf("definition %q Validate: %v", definition.Key, err)
 		}
+	}
+}
+
+func TestMaximumAgreementDescriptionsFitDiscord(t *testing.T) {
+	items := make([]Agreement, 20)
+	for index := range items {
+		items[index] = Agreement{CompanyID: "company", CompanyName: strings.Repeat("A", 80), ID: strings.Repeat("b", 64), Description: strings.Repeat("D", 1000)}
+	}
+	definitions, err := Render(items, Config{ChannelID: "123", ControlChannelID: "456"}, "789")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, definition := range definitions {
+		if err := definition.Validate(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestInvalidCompanyAndAgreementInputs(t *testing.T) {
+	service := NewService(Config{Enabled: true}, nil, nil, "123")
+	for _, item := range [][2]string{{"", "Valid company"}, {"UPPERCASE", "Valid company"}, {"company", ""}, {"company", strings.Repeat("x", 81)}} {
+		if _, err := service.CreateCompany(context.Background(), item[0], item[1]); !errors.Is(err, ErrInvalidCompany) {
+			t.Fatalf("accepted invalid company: %v", err)
+		}
+	}
+	if _, err := service.Create(context.Background(), "missing space", "id", "Description", "", "123"); !errors.Is(err, ErrInvalidCompany) {
+		t.Fatal(err)
+	}
+	if _, err := service.Create(context.Background(), "company", "id", "Description", "http://example.com/image.png", "123"); !errors.Is(err, ErrInvalidImageURL) {
+		t.Fatal(err)
 	}
 }

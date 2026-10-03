@@ -6,10 +6,8 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/gofiber/fiber/v2"
-	"github.com/niflaot/corps-manager/internal/announcements"
-	"github.com/niflaot/corps-manager/internal/inactivity"
+	"github.com/niflaot/corps-manager/internal/agreements"
 	"github.com/niflaot/corps-manager/internal/messages"
-	"github.com/niflaot/corps-manager/internal/performance"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/health"
 	"go.uber.org/fx"
@@ -27,7 +25,7 @@ type Config struct {
 // Module provides HTTP configuration, routes, Fiber application, and server.
 var Module = fx.Module("httpapi", fx.Provide(
 	LoadConfig,
-	fx.Annotate(provideDependencies, fx.ParamTags("", "", "", "", `name:"customer_page"`)),
+	provideDependencies,
 	provideApplication, provideServer,
 ))
 
@@ -47,11 +45,8 @@ func LoadConfig() (Config, error) {
 	return config, nil
 }
 
-func provideDependencies(messageService *messages.Service, performanceService *performance.Service,
-	inactivityService *inactivity.Service, announcementService *announcements.Service,
-	customerPage fiber.Handler) Dependencies {
-	return Dependencies{Messages: messageService, Performance: performanceService, Inactivity: inactivityService,
-		Announcements: announcementService, CustomerPage: customerPage}
+func provideDependencies(messageService *messages.Service, agreementService *agreements.Service) Dependencies {
+	return Dependencies{Messages: messageService, Companies: agreementService}
 }
 
 func provideApplication(log *zap.Logger, appConfig appconfig.Config, apiConfig Config,

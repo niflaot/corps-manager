@@ -1,176 +1,148 @@
-# corps-manager v1.5.0
+# corps-manager v2.0.0
 
-Bot de Discord en Go para mantener mensajes editables, publicar el rendimiento de un negocio de SARP y administrar operaciones internas. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
+Bot modular de Discord en Go con mensajes administrados e idempotentes, verificación por rol, canal anti bots y convenios por empresa. Usa DiscordGo, Fiber, Uber Fx, Zap, PostgreSQL y Liquibase.
 
-El dashboard es un mensaje administrado con Components V2. Su definición y el ID remoto quedan en PostgreSQL: cada actualización edita el mismo mensaje y el reconciliador lo restaura si fue alterado o eliminado.
-
-## Configuración
+## Configuración y arranque
 
 ```sh
 cp .env.example .env
-```
-
-Variables obligatorias del proceso:
-
-```dotenv
-DISCORD_BOT_TOKEN=
-DISCORD_BOT_GUILD_ID=
-DISCORD_BOT_API_KEY=
-DISCORD_BOT_PERFORMANCE_CHANNEL_ID=
-DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=
-DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=
-DISCORD_BOT_CUSTOMERS_CHANNEL_ID=
-DISCORD_BOT_AGREEMENTS_CHANNEL_ID=
-```
-
-El bot sólo necesita `View Channel`, `Send Messages` y `Manage Messages` en el canal configurado. No usa verificación, OAuth, Redis, el intent privilegiado de miembros ni requiere permiso de administrador.
-
-Activa el monitor con:
-
-```dotenv
-DISCORD_BOT_PERFORMANCE_ENABLED=true
-DISCORD_BOT_PERFORMANCE_ENDPOINT=https://flare.niflaot.dev/api/query
-DISCORD_BOT_PERFORMANCE_ENDPOINT_TOKEN=
-DISCORD_BOT_PERFORMANCE_BUSINESS_ID=1995
-DISCORD_BOT_PERFORMANCE_CHANNEL_ID=123456789012345678
-DISCORD_BOT_PERFORMANCE_INTERVAL=6h
-DISCORD_BOT_PERFORMANCE_CUTOFF_WEEKDAY=Sunday
-DISCORD_BOT_PERFORMANCE_TIMEZONE=America/Bogota
-
-DISCORD_BOT_INACTIVITY_ENABLED=true
-DISCORD_BOT_INACTIVITY_REFRESH_INTERVAL=6h
-DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID=123456789012345678
-DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID=987654321098765432
-DISCORD_BOT_ANNOUNCEMENT_COOLDOWN=30m
-
-DISCORD_BOT_CUSTOMERS_ENABLED=true
-DISCORD_BOT_CUSTOMERS_CHANNEL_ID=123456789012345678
-DISCORD_BOT_CUSTOMERS_PUBLIC_URL=https://corps.niflaot.dev/customers
-DISCORD_BOT_CUSTOMERS_REFRESH_INTERVAL=6h
-
-DISCORD_BOT_AGREEMENTS_ENABLED=true
-DISCORD_BOT_AGREEMENTS_CHANNEL_ID=123456789012345678
-DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL=6h
-```
-
-`DISCORD_BOT_PERFORMANCE_ENDPOINT` debe apuntar al `POST /api/query` de `sarp-scrapper`. El bot envía esta consulta, por lo que el token real de SARP permanece únicamente en `sarp-scrapper`:
-
-```json
-{"provider":"gta-rol","path":"/businesses/1995"}
-```
-
-`DISCORD_BOT_PERFORMANCE_ENDPOINT_TOKEN` es opcional y sirve sólo si el túnel o reverse proxy protege ese endpoint con Bearer. No es el token de la API de SARP.
-
-## Cortes de ganancias y servicio
-
-Al iniciar, el bot consulta inmediatamente y luego repite cada seis horas. El primer muestreo registra los valores actuales como histórico y establece la línea base semanal en cero. Los siguientes muestreos suman únicamente incrementos positivos de `earnings` y del contador de servicio `historical_duty_time + duty_time`; una reducción o reinicio cambia la línea base sin restar del histórico.
-
-Cada domingo a las 00:00 en `America/Bogota` comienza un periodo nuevo. El corte anterior queda almacenado en PostgreSQL con dinero y minutos de servicio, tanto totales como desglosados por personaje. Se conservan 104 cortes por defecto. Los empleados que ya no aparecen quedan en el histórico, pero se marcan como inactivos.
-
-Las tablas del dashboard usan nombres compactos (`Thomas_Jhonson` → `Thomas J.`) y un ancho fijo de 50 columnas para evitar saltos de línea en Discord.
-
-## Registro de inactividad
-
-El bot publica el panel de empleados en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. **Ver inactivos** abre una lista efímera y paginada de 20 registros que sólo ve quien la consulta, sin publicar mensajes adicionales en el canal. Los botones **Añadir empleado** y **Retirar empleado** abren un formulario efímero que exige el formato `Nombre_Apellido`; sólo miembros con `Manage Messages` o `Administrator` pueden modificarlo. La lista reside en PostgreSQL y el mensaje público muestra únicamente su total.
-
-El bot publica el panel administrado con **Accionar apertura** en `DISCORD_BOT_ANNOUNCEMENT_CONTROL_CHANNEL_ID`, separado del canal de rendimiento. Cualquier miembro con acceso al canal puede usarlo. `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` selecciona el canal público donde el bot envía el embed de apertura, menciona a `@everyone` y muestra quién lo accionó. En ese canal, el bot necesita además `Embed Links` y `Mention Everyone`. Deja `DISCORD_BOT_ANNOUNCEMENT_CHANNEL_ID` vacío para desactivar por completo los anuncios de apertura.
-
-Las keys de los mensajes están fijadas internamente; no requieren variables de entorno.
-
-El botón y la API comparten un cooldown persistente de `DISCORD_BOT_ANNOUNCEMENT_COOLDOWN` (30 minutos por defecto). La adquisición es atómica, sobrevive reinicios y evita anuncios duplicados por pulsaciones simultáneas. Si Discord rechaza la publicación, el cooldown se libera automáticamente.
-
-## Clientes frecuentes
-
-`DISCORD_BOT_CUSTOMERS_CHANNEL_ID` contiene un panel administrado con el ranking de visitas. **Registrar atención** solicita el nombre y el monto gastado; el bot normaliza el nombre a minúsculas y sustituye espacios, guiones y separadores por `_`. Cada atención conserva monto, fecha, ID estable de Discord y el apodo visible, por lo que una persona no se duplica aunque cambie de nombre.
-
-**Ver clientes** abre `DISCORD_BOT_CUSTOMERS_PUBLIC_URL`, una página pública de solo lectura que permite buscar sin importar mayúsculas, espacios o `_`, ordenar por gasto, visitas, fecha o nombre y limitar los cálculos a los últimos X días. **Consultar cliente** conserva el detalle privado con responsables e IDs. **Eliminar cliente** borra todo el historial y sólo funciona para el dueño real de la guild, validado directamente contra Discord.
-
-Los filtros por periodo y los importes comienzan con las atenciones registradas después de aplicar la migración de gasto; los contadores históricos anteriores se conservan, pero no contienen monto ni eventos diarios que puedan reconstruirse con precisión.
-
-## Convenios
-
-El bot coloca un panel separado con **Añadir convenio** en `DISCORD_BOT_PERFORMANCE_CHANNEL_ID`. El formulario solicita ID, descripción y una URL HTTPS opcional para la foto. El listado administrado se publica y actualiza en `DISCORD_BOT_AGREEMENTS_CHANNEL_ID`; **Ver convenios** permite consultar el resto de manera privada cuando la lista visible supera diez elementos.
-
-## Base de datos
-
-Ejecuta Liquibase antes del servicio:
-
-```sh
 cp database/liquibase.example.properties database/liquibase.properties
 liquibase --defaults-file=database/liquibase.properties validate
 liquibase --defaults-file=database/liquibase.properties update
-```
-
-Los changelogs pertenecen a cada dominio bajo `internal/*/postgres/`, incluidos clientes y convenios. La aplicación no modifica el esquema durante el arranque.
-
-## Ejecutar
-
-```sh
 go run ./cmd serve
 ```
 
-Rutas públicas:
+Configura `DISCORD_BOT_TOKEN`, `DISCORD_BOT_GUILD_ID`, `DISCORD_BOT_API_KEY` y las variables PostgreSQL. El bot administra únicamente esa guild. Los controles nuevos están deshabilitados por defecto para permitir configurar sus recursos antes de activarlos.
 
-- `GET /status`
-- `GET /customers`: directorio filtrable de clientes frecuentes.
-- `GET /docs` y `GET /openapi.json` únicamente en `development`
+La aplicación no aplica migraciones al iniciar. `go run ./cmd version` muestra la versión del binario.
 
-Rutas protegidas con `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
+## Mensajes administrados
 
-- `GET /api/performance`: estado persistido, totales, empleados y cortes.
-- `POST /api/performance/refresh`: fuerza una consulta y actualiza el dashboard.
-- `POST /api/performance/current-period/backfill`: corrige el primer snapshot de empleados nuevos dentro del periodo indicado.
-- `GET /api/inactivity`: consulta el registro de expulsados.
-- `POST /api/inactivity` con `{"name":"Nombre_Apellido"}`: añade un empleado.
-- `DELETE /api/inactivity/Nombre_Apellido`: retira un empleado.
-- `POST /api/announcements/opening` con body opcional `{"actor":"Thomas J."}`: publica la apertura y activa el cooldown.
-- `GET /api/announcements/opening/cooldown`: consulta quién anunció y cuándo vuelve a estar disponible.
-- `DELETE /api/announcements/opening/cooldown`: libera inmediatamente el cooldown.
-- `/api/messages`: administración genérica de mensajes editables.
-
-Ejemplo de actualización manual:
+La API mantiene la definición y el ID remoto en PostgreSQL. El reconciliador publica Components V2, edita el mismo mensaje y lo recrea si desaparece. Las mutaciones requieren `Idempotency-Key`; los reemplazos y archivados requieren además `If-Match` con la revisión actual. Repetir una operación con la misma clave devuelve su resultado anterior; reutilizarla con otro contenido produce conflicto. Las claves idempotentes se conservan 24 horas.
 
 ```sh
-curl -X POST http://127.0.0.1:3100/api/performance/refresh \
-  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
-```
-
-Ejemplo de apertura y liberación manual:
-
-```sh
-curl -X POST https://corps.niflaot.dev/api/announcements/opening \
+curl -X POST http://127.0.0.1:3100/api/messages \
   -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"actor":"Thomas J."}'
-
-curl -X DELETE https://corps.niflaot.dev/api/announcements/opening/cooldown \
-  -H "Authorization: Bearer $DISCORD_BOT_API_KEY"
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: verification-create-1' \
+  -d '{
+    "key":"verification",
+    "guildId":"123456789012345678",
+    "channelId":"234567890123456789",
+    "payload":{
+      "components":[{"type":10,"content":"# Bienvenido\nLee las reglas y verifica tu acceso."}],
+      "allowedMentions":{"parse":[]}
+    }
+  }'
 ```
 
-## Estructura
+## Verificación por rol
 
-- `internal/messages/`: mensajes durables y reconciliación con Discord.
-- `internal/performance/`: periodos, deltas, histórico y dashboard.
-- `internal/inactivity/`: registro durable, formulario y segundo mensaje.
-- `internal/announcements/`: apertura pública y cooldown durable compartido.
-- `internal/customers/`: clientes frecuentes, visitas y responsables de atención.
-- `internal/agreements/`: convenios y listado público administrado.
-- `platform/sarp/`: cliente del endpoint configurable de `sarp-scrapper`.
-- `platform/httpapi/`: API Fiber y contrato OpenAPI/Scalar.
-- `platform/discord/`: sesión DiscordGo y gateway de mensajes.
-- `platform/customerdiscord/` y `platform/agreementdiscord/`: formularios e interacciones de cada dominio.
-- `platform/postgres/`: pool PostgreSQL compartido.
-- `internal/cronjob/`: trabajos periódicos context-aware.
+Crea tu mensaje mediante la API y configura su key:
 
-## Validar
+```dotenv
+DISCORD_BOT_VERIFICATION_ENABLED=true
+DISCORD_BOT_VERIFICATION_CHANNEL_ID=234567890123456789
+DISCORD_BOT_VERIFICATION_MESSAGE_KEY=verification
+DISCORD_BOT_VERIFICATION_ROLE_ID=345678901234567890
+DISCORD_BOT_SECURITY_REFRESH_INTERVAL=1m
+```
+
+El control añade un único botón **Verificarme** y conserva tu contenido. Cada pulsación válida asigna el rol al autor de la interacción. Solo se acepta el mensaje remoto actual, en el canal y la guild configurados; los mensajes copiados, antiguos o archivados no verifican. Asignar de nuevo el mismo rol es idempotente.
+
+Puedes editar el contenido mediante la API; consulta primero la revisión actual porque la inserción del control también modifica la definición. Deja espacio para una fila y un botón dentro de los límites de Components V2. El control se instala al iniciar y se revisa periódicamente. Si la key aún no existe, se registra el error y se vuelve a intentar en la próxima revisión.
+
+Esta versión verifica mediante una pulsación, sin CAPTCHA ni comprobación de identidad externa. El bot necesita `Manage Roles` y su rol debe estar por encima del rol que entrega.
+
+## Canal anti bots
+
+```dotenv
+DISCORD_BOT_ANTIBOT_ENABLED=true
+DISCORD_BOT_SECURITY_REFRESH_INTERVAL=1m
+```
+
+El bot crea o adopta un canal de texto llamado **no-escribir** dentro de la categoría **Control anti bots**, ubicada al final del servidor. Publica un mensaje administrado con el texto **no escribir, control anti bots**.
+
+Cualquier autor que publique allí se banea, incluidos otros bots; únicamente se excluye este bot. No se borran mensajes históricos al banear. Discord puede impedir el baneo del propietario o de miembros con una jerarquía superior; estos fallos se registran como errores.
+
+La revisión al iniciar y cada minuto, por defecto:
+
+- Conserva el canal canónico mediante su asignación persistida; lo recrea si desaparece.
+- Repara nombre, categoría, posición, descripción y permisos del canal.
+- Mantiene el canal visible y escribible para `@everyone`, y desactiva la creación de hilos.
+- Elimina otros canales llamados exactamente `no-escribir` en la guild configurada.
+- Solicita la reparación del aviso administrado y elimina mensajes adicionales del propio bot cuando el aviso canónico existe.
+
+El nombre `no-escribir` queda reservado para este control. El bot necesita `Manage Channels`, `Ban Members`, `View Channel`, `Send Messages`, `Read Message History` y `Manage Messages`. No necesita intent privilegiado de miembros ni de contenido de mensajes. Ejecuta una sola instancia activa del bot para coordinar la creación de canales.
+
+## Empresas y convenios
+
+Las empresas son un catálogo dinámico, sin tres tipos fijos. Se administran mediante la API protegida:
+
+```sh
+curl -X POST http://127.0.0.1:3100/api/companies \
+  -H "Authorization: Bearer $DISCORD_BOT_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"empresa-a","name":"Empresa A"}'
+```
+
+`GET /api/companies` lista las empresas. `DELETE /api/companies/:id` elimina una empresa vacía; devuelve `409` si tiene convenios. El identificador de empresa es único. La creación duplicada devuelve `409` y no genera otra empresa. Estas operaciones están disponibles aunque el panel de Discord esté deshabilitado.
+
+```dotenv
+DISCORD_BOT_AGREEMENTS_ENABLED=true
+DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID=456789012345678901
+DISCORD_BOT_AGREEMENTS_CHANNEL_ID=567890123456789012
+DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL=6h
+```
+
+El canal de control conserva el panel administrado con **Añadir convenio** y **Ver convenios**. Al añadir, eliges una empresa en un selector privado paginado y completas el formulario con identificador, descripción e imagen HTTPS opcional. El catálogo admite más de 25 empresas mediante paginación.
+
+El identificador del convenio es único **dentro de su empresa**: dos empresas pueden usar el mismo. La descripción admite de 3 a 1000 caracteres. El listado público muestra la empresa de cada convenio y hasta tres convenios completos para respetar los límites de Discord. La consulta privada permite recorrer todo el listado. Quienes tengan acceso al canal de control pueden registrar convenios; restringe ese canal al equipo que los administra.
+
+## API
+
+Rutas públicas: `GET /status`; `GET /docs` y `GET /openapi.json` solamente en `development`.
+
+Todas las rutas `/api` requieren `Authorization: Bearer <DISCORD_BOT_API_KEY>`:
+
+| Método | Ruta | Acción |
+|---|---|---|
+| GET / POST | `/api/messages` | Listar o crear mensajes |
+| GET / PUT / DELETE | `/api/messages/:key` | Consultar, reemplazar o archivar |
+| PUT | `/api/messages/:key/assignment` | Cambiar asignación |
+| POST | `/api/messages/:key/reconcile` | Pedir revisión inmediata |
+| GET / POST | `/api/companies` | Listar o crear empresas |
+| DELETE | `/api/companies/:id` | Eliminar una empresa vacía |
+
+## Actualización desde la versión anterior
+
+La migración de v2 elimina las tablas de rendimiento SARP, inactividad, anuncios y clientes frecuentes. Vacía los convenios anteriores y añade empresas y la clave compuesta de convenios. No crea empresas iniciales automáticamente.
+
+Los mensajes personalizados y su idempotencia se conservan. Las definiciones de los antiguos paneles se archivan; archivar detiene su reconciliación y no borra el mensaje ya publicado en Discord. Esos mensajes antiguos pueden retirarse manualmente. Los paneles de convenios se reinician con un aviso vacío y adoptan el nuevo contenido al habilitar el módulo.
+
+Los directorios de rendimiento, inactividad y anuncios conservan únicamente el historial de Liquibase y sus cambios de retirada. Clientes se eliminó por completo de `internal/` y `platform/`; `database/retired-customers.xml` solo limpia sus tablas y archiva el panel en bases existentes, sin recrear su esquema en instalaciones nuevas.
+
+Se retiraron también las variables `PERFORMANCE_*`, `INACTIVITY_*`, `ANNOUNCEMENT_*` y `CUSTOMERS_*`, el directorio web `/customers` y sus rutas API. El canal de control de convenios ahora usa `DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID`.
+
+## Arquitectura y despliegue
+
+- `internal/messages`: persistencia, idempotencia y reconciliación de mensajes.
+- `internal/security`: políticas de verificación y anti bots.
+- `internal/agreements`: empresas, convenios y paneles.
+- `internal/cronjob`: trabajos cancelables por contexto.
+- `platform/`: adaptadores de Discord, API HTTP, PostgreSQL, reloj, logs y composición Fx.
+
+El Dockerfile compila con `golang:1.26.1-bookworm` y produce una imagen mínima que escucha en `0.0.0.0:3100`; `Dockerfile.migrations` incluye todos los changelogs. Ambos excluyen credenciales locales del contexto de construcción. El stack existente de Portainer descarga la referencia Git seleccionada, aplica Liquibase y compila el bot con `DISCORD_BOT_GO_IMAGE`: este flujo no ejecuta el Dockerfile. GHCR solo se publica desde tags `v*.*.*`, tras validar y compilar la versión.
+
+## Validación
 
 ```sh
 test -z "$(gofmt -l .)"
 go test ./...
 go vet ./...
-staticcheck ./...
+go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
 go test ./... -race
 go build -trimpath -o /tmp/discord-bot ./cmd
 ```
 
-El stack para Portainer está en `deploy/portainer/mt-discord-bot/docker-compose.yml` y ejecuta la imagen de migraciones antes de iniciar el bot.
+Las pruebas de integración de PostgreSQL requieren `DISCORD_BOT_INTEGRATION_POSTGRES_DSN` apuntando a una base de pruebas con Liquibase aplicado. Usan tablas de prueba truncadas: no apuntes esa variable a una base con datos que quieras conservar.

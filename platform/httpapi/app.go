@@ -6,10 +6,8 @@ import (
 
 	"github.com/gofiber/contrib/fiberzap"
 	"github.com/gofiber/fiber/v2"
-	"github.com/niflaot/corps-manager/internal/announcements"
-	"github.com/niflaot/corps-manager/internal/inactivity"
+	"github.com/niflaot/corps-manager/internal/agreements"
 	"github.com/niflaot/corps-manager/internal/messages"
-	"github.com/niflaot/corps-manager/internal/performance"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/health"
 	"go.uber.org/zap"
@@ -31,60 +29,22 @@ type MessageService interface {
 	Reconcile(context.Context, string) error
 }
 
-// PerformanceService contains HTTP-facing business performance use cases.
-type PerformanceService interface {
-	// Get returns the current persisted aggregate.
-	Get(context.Context) (performance.State, error)
-	// Refresh immediately collects and publishes a new snapshot.
-	Refresh(context.Context) (performance.State, error)
-	// BackfillCurrentPeriod corrects first observations for selected new employees.
-	BackfillCurrentPeriod(context.Context, performance.CurrentPeriodBackfill) (performance.State, error)
-}
-
-// InactivityService contains HTTP-facing inactivity registry use cases.
-type InactivityService interface {
-	// List returns all inactivity dismissal entries.
-	List(context.Context) ([]inactivity.Entry, error)
-	// Add registers one employee dismissal.
-	Add(context.Context, string, string) (inactivity.Entry, error)
-	// Remove deletes one employee dismissal.
-	Remove(context.Context, string) error
-}
-
-// AnnouncementService contains HTTP-facing opening-announcement use cases.
-type AnnouncementService interface {
-	// AnnounceOpening publishes an opening if its cooldown is available.
-	AnnounceOpening(context.Context, string) (announcements.State, error)
-	// GetCooldown returns the persisted opening cooldown.
-	GetCooldown(context.Context) (announcements.State, error)
-	// ClearCooldown makes the opening announcement immediately available.
-	ClearCooldown(context.Context) error
+// CompanyService contains HTTP-facing agreement company operations.
+type CompanyService interface {
+	// CreateCompany creates a company available in Discord forms.
+	CreateCompany(context.Context, string, string) (agreements.Company, error)
+	// ListCompanies returns companies in identifier order.
+	ListCompanies(context.Context) ([]agreements.Company, error)
+	// DeleteCompany deletes an empty company.
+	DeleteCompany(context.Context, string) error
 }
 
 // Dependencies contains optional HTTP use-case dependencies.
 type Dependencies struct {
-	// Messages manages static Discord message definitions.
+	// Messages manages durable Discord message definitions.
 	Messages MessageService
-	// Performance manages business earnings collection.
-	Performance PerformanceService
-	// Inactivity manages employees dismissed for inactivity.
-	Inactivity InactivityService
-	// Announcements manages public business-opening announcements.
-	Announcements AnnouncementService
-	// CustomerPage renders the public read-only frequent-customer directory.
-	CustomerPage fiber.Handler
-}
-
-// InactivityMutationRequest contains one Nombre_Apellido registry value.
-type InactivityMutationRequest struct {
-	// Name is the employee roleplay name.
-	Name string `json:"name"`
-}
-
-// OpeningAnnouncementRequest contains optional announcement attribution.
-type OpeningAnnouncementRequest struct {
-	// Actor is shown in the Discord embed footer.
-	Actor string `json:"actor"`
+	// Companies manages the available agreement companies.
+	Companies CompanyService
 }
 
 // ErrorResponse is a JSON error response body.

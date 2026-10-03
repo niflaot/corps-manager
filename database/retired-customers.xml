@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="security-v2-remove-customer-directory" author="corps-manager">
+        <sql>
+            DROP TABLE IF EXISTS frequent_customer_visits;
+            DROP TABLE IF EXISTS frequent_customer_attendants;
+            DROP TABLE IF EXISTS frequent_customers;
+            UPDATE managed_messages
+                SET state = 'archived', revision = revision + 1,
+                    lease_owner = NULL, lease_until = NULL, updated_at = now()
+                WHERE key = 'frequent-customers' AND state != 'archived';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

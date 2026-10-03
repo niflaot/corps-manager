@@ -7,3 +7,9 @@ COPY internal/messages/postgres/changelog.xml ./internal/messages/postgres/chang
 COPY internal/messages/postgres/migrations ./internal/messages/postgres/migrations
 COPY internal/performance/postgres/changelog.xml ./internal/performance/postgres/changelog.xml
 COPY internal/performance/postgres/migrations ./internal/performance/postgres/migrations
+COPY internal/inactivity/postgres/changelog.xml ./internal/inactivity/postgres/changelog.xml
+COPY internal/inactivity/postgres/migrations ./internal/inactivity/postgres/migrations
+COPY internal/announcements/postgres/changelog.xml ./internal/announcements/postgres/changelog.xml
+COPY internal/announcements/postgres/migrations ./internal/announcements/postgres/migrations
+COPY internal/agreements/postgres/changelog.xml ./internal/agreements/postgres/changelog.xml
+COPY internal/agreements/postgres/migrations ./internal/agreements/postgres/migrations

@@ -12,7 +12,7 @@ import (
 	"github.com/niflaot/corps-manager/platform/cli"
 )
 
-var version = "1.3.0"
+var version = "2.0.0"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

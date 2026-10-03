@@ -6,4 +6,9 @@
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <include file="migrations/0001_create_business_performance.sql" relativeToChangelogFile="true"/>
+
+    <changeSet id="security-v1-retire-performance" author="corps-manager">
+        <dropTable tableName="business_performance_state"/>
+        <sql>UPDATE managed_messages SET state = 'archived', revision = revision + 1, lease_owner = NULL, lease_until = NULL, updated_at = now() WHERE key IN ('business-performance');</sql>
+    </changeSet>
 </databaseChangeLog>

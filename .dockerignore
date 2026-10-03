@@ -10,3 +10,6 @@ dist/
 build/
 *.test
 coverage.out
+.env
+.env.*
+database/liquibase.properties

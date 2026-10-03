@@ -6,4 +6,19 @@
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <include file="migrations/0001_create_business_agreements.sql" relativeToChangelogFile="true"/>
+    <changeSet id="security-v1-company-agreements" author="corps-manager">
+        <delete tableName="business_agreements"/>
+        <createTable tableName="agreement_companies">
+            <column name="company_id" type="varchar(64)"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="name" type="varchar(80)"><constraints nullable="false"/></column>
+        </createTable>
+        <sql>ALTER TABLE agreement_companies ADD CONSTRAINT company_id_format CHECK (company_id ~ '^[a-z0-9][a-z0-9_-]{0,63}$'), ADD CONSTRAINT company_name_length CHECK (length(name) BETWEEN 2 AND 80);</sql>
+        <dropPrimaryKey tableName="business_agreements" constraintName="business_agreements_pkey"/>
+        <addColumn tableName="business_agreements">
+            <column name="company_id" type="varchar(64)"><constraints nullable="false"/></column>
+        </addColumn>
+        <addPrimaryKey tableName="business_agreements" columnNames="company_id,agreement_id" constraintName="business_agreements_pkey"/>
+        <addForeignKeyConstraint baseTableName="business_agreements" baseColumnNames="company_id" referencedTableName="agreement_companies" referencedColumnNames="company_id" constraintName="agreement_company_fk" onDelete="RESTRICT"/>
+        <sql>UPDATE managed_messages SET payload = '{"components":[{"type":10,"content":"No hay convenios registrados. Abre el nuevo control para elegir una empresa."}],"allowedMentions":{"parse":[]}}'::jsonb, desired_hash = 'c8dbbcb1bf1baa64d1583c59697585411423d96c5b66aea0413c6ec751753847', revision = revision + 1, state = 'pending', next_check_at = now(), lease_owner = NULL, lease_until = NULL WHERE key IN ('business-agreements','business-agreements-control') AND state != 'archived';</sql>
+    </changeSet>
 </databaseChangeLog>
