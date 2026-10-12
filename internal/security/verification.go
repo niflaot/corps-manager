@@ -11,8 +11,8 @@ import (
 
 const mutationPrefix = "security-control"
 
-func (service *Service) refreshVerification(ctx context.Context) error {
-	record, err := service.messages.Get(ctx, service.config.MessageKey)
+func (service *Service) refreshVerification(ctx context.Context, config Config) error {
+	record, err := service.messages.Get(ctx, config.MessageKey)
 	if err != nil {
 		return fmt.Errorf("read verification message: %w", err)
 	}
@@ -20,7 +20,7 @@ func (service *Service) refreshVerification(ctx context.Context) error {
 		return ErrNotReady
 	}
 	definition := record.Definition
-	definition.ChannelID = service.config.ChannelID
+	definition.ChannelID = config.ChannelID
 	definition.Payload, err = withVerificationButton(definition.Payload)
 	if err != nil {
 		return err

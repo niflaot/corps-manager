@@ -23,6 +23,8 @@ const (
 	TrapCategoryName = "Control anti bots"
 	// DefaultRefreshInterval is the default integrity check interval.
 	DefaultRefreshInterval = time.Minute
+	// DefaultMessageKey is the default managed verification message key.
+	DefaultMessageKey = "verification"
 )
 
 var snowflakePattern = regexp.MustCompile(`^[0-9]{1,20}$`)
@@ -44,9 +46,25 @@ type Config struct {
 	RefreshInterval time.Duration `env:"DISCORD_BOT_SECURITY_REFRESH_INTERVAL"`
 }
 
-// LoadConfig validates enabled security features without requiring disabled resources.
+// validateBindings verifies the format of every configured binding.
+func (config Config) validateBindings() error {
+	if config.ChannelID != "" && !snowflakePattern.MatchString(config.ChannelID) || config.RoleID != "" && !snowflakePattern.MatchString(config.RoleID) {
+		return fmt.Errorf("verification channel and role must be Discord snowflakes")
+	}
+	if !messageKeyPattern.MatchString(config.MessageKey) || config.MessageKey == TrapMessageKey {
+		return fmt.Errorf("verification requires a nonreserved managed message key")
+	}
+	return nil
+}
+
+// VerificationReady reports whether verification is enabled and fully bound.
+func (config Config) VerificationReady() bool {
+	return config.VerificationEnabled && config.ChannelID != "" && config.RoleID != ""
+}
+
+// LoadConfig reads the environment defaults; runtime settings may override them.
 func LoadConfig() (Config, error) {
-	config := Config{RefreshInterval: DefaultRefreshInterval}
+	config := Config{RefreshInterval: DefaultRefreshInterval, MessageKey: DefaultMessageKey}
 	if err := env.Parse(&config); err != nil {
 		return Config{}, err
 	}
@@ -56,8 +74,11 @@ func LoadConfig() (Config, error) {
 	if config.RefreshInterval <= 0 {
 		return Config{}, fmt.Errorf("security refresh interval must be positive")
 	}
-	if config.VerificationEnabled && (!snowflakePattern.MatchString(config.ChannelID) || !snowflakePattern.MatchString(config.RoleID) || !messageKeyPattern.MatchString(config.MessageKey) || config.MessageKey == TrapMessageKey) {
-		return Config{}, fmt.Errorf("verification requires a valid channel, role, and nonreserved managed message key")
+	if config.MessageKey == "" {
+		config.MessageKey = DefaultMessageKey
+	}
+	if err := config.validateBindings(); err != nil {
+		return Config{}, err
 	}
 	return config, nil
 }

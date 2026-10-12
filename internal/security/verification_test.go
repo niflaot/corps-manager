@@ -41,8 +41,12 @@ func TestSecurityConfigRequiresBindingsOnlyWhenEnabled(t *testing.T) {
 	}
 	t.Setenv("DISCORD_BOT_VERIFICATION_ENABLED", "true")
 	t.Setenv("DISCORD_BOT_VERIFICATION_CHANNEL_ID", "")
+	if _, err := LoadConfig(); err != nil {
+		t.Fatalf("rejected unset bindings that runtime settings may provide: %v", err)
+	}
+	t.Setenv("DISCORD_BOT_VERIFICATION_CHANNEL_ID", "not-a-channel")
 	if _, err := LoadConfig(); err == nil {
-		t.Fatal("accepted missing channel")
+		t.Fatal("accepted malformed channel")
 	}
 	t.Setenv("DISCORD_BOT_VERIFICATION_CHANNEL_ID", "123")
 	t.Setenv("DISCORD_BOT_VERIFICATION_ROLE_ID", "456")

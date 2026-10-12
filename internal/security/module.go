@@ -6,6 +6,7 @@ import (
 
 	"github.com/niflaot/corps-manager/internal/cronjob"
 	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/settings"
 	"go.uber.org/fx"
 )
 
@@ -15,12 +16,12 @@ const integrityTimeout = 45 * time.Second
 // Module provides the security policies and their periodic integrity job.
 var Module = fx.Module("security", fx.Provide(
 	LoadConfig,
-	fx.Annotate(provideService, fx.ParamTags("", `name:"guild_id"`, "", "")),
+	fx.Annotate(provideService, fx.ParamTags("", `name:"guild_id"`, "", "", "")),
 	fx.Annotate(provideJob, fx.ResultTags(`group:"cronjobs"`)),
 ))
 
-func provideService(config Config, guildID string, store *messages.Service, gateway Gateway) *Service {
-	return NewService(config, guildID, store, gateway)
+func provideService(config Config, guildID string, store *messages.Service, gateway Gateway, runtime settings.Store) *Service {
+	return NewService(config, guildID, store, gateway, runtime)
 }
 
 func provideJob(config Config, service *Service) cronjob.Job {

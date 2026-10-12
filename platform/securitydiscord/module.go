@@ -10,7 +10,11 @@ import (
 )
 
 // Module exposes the Discord security gateway and lifecycle-bound handlers.
-var Module = fx.Module("security-discord", fx.Provide(fx.Annotate(NewGateway, fx.As(new(security.Gateway)))), fx.Invoke(register))
+var Module = fx.Module("security-discord", fx.Provide(
+	fx.Annotate(NewGateway, fx.As(new(security.Gateway))),
+	fx.Annotate(newVerificationCommand, fx.ResultTags(`group:"discord_commands"`)),
+	fx.Annotate(newAntibotCommand, fx.ResultTags(`group:"discord_commands"`)),
+), fx.Invoke(register))
 
 func register(lifecycle fx.Lifecycle, client *discord.Client, service *security.Service, log *zap.Logger) {
 	ctx, cancel := context.WithCancel(context.Background())

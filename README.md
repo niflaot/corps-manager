@@ -75,6 +75,23 @@ La revisión al iniciar y cada minuto, por defecto:
 
 El nombre `no-escribir` queda reservado para este control. El bot necesita `Manage Channels`, `Ban Members`, `View Channel`, `Send Messages`, `Read Message History` y `Manage Messages`. No necesita intent privilegiado de miembros ni de contenido de mensajes. Ejecuta una sola instancia activa del bot para coordinar la creación de canales.
 
+## Comandos de barra
+
+Al arrancar, el bot registra en la guild los comandos `/verificacion`, `/antibot` y `/mensaje`. Son solo para administradores y conviven con la API, que sigue disponible sin cambios.
+
+| Comando | Función |
+| --- | --- |
+| `/verificacion configurar` | Guarda canal, rol, clave y estado; aplica el cambio de inmediato |
+| `/verificacion publicar` / `estado` | Sincroniza el mensaje con el botón / muestra la configuración vigente |
+| `/antibot configurar` / `estado` | Activa o desactiva la trampa / muestra su estado |
+| `/mensaje crear` / `editar` | Recibe JSON, lo valida, muestra la vista previa y pide confirmación |
+| `/mensaje previsualizar` | Valida un JSON y lo muestra sin publicar nada |
+| `/mensaje ver` / `archivar` / `listar` | Exporta el JSON vigente, deja de gestionar un mensaje o lista los existentes |
+
+El JSON se adjunta en `archivo` (hasta 256 KiB) o se pega en un formulario si se omite. Acepta el mismo objeto que la API (`{"components":[...],"allowedMentions":{...}}`) o un arreglo de componentes. La vista previa es privada, no menciona a nadie y muestra los botones desactivados; la publicación ocurre solo al pulsar **Confirmar**.
+
+Los valores guardados con `/verificacion` y `/antibot` se almacenan en la tabla `bot_settings` y tienen prioridad sobre las variables `DISCORD_BOT_VERIFICATION_*` y `DISCORD_BOT_ANTIBOT_ENABLED`, que quedan como valores iniciales. Aplica la migración de Liquibase antes de desplegar.
+
 ## Empresas y convenios
 
 Las empresas son un catálogo dinámico, sin tres tipos fijos. Se administran mediante la API protegida:
@@ -129,6 +146,8 @@ Se retiraron también las variables `PERFORMANCE_*`, `INACTIVITY_*`, `ANNOUNCEME
 
 - `internal/messages`: persistencia, idempotencia y reconciliación de mensajes.
 - `internal/security`: políticas de verificación y anti bots.
+- `internal/settings`: ajustes editables en runtime (PostgreSQL).
+- `platform/messagesdiscord`: comando `/mensaje`.
 - `internal/agreements`: empresas, convenios y paneles.
 - `internal/cronjob`: trabajos cancelables por contexto.
 - `platform/`: adaptadores de Discord, API HTTP, PostgreSQL, reloj, logs y composición Fx.

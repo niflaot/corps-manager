@@ -7,6 +7,7 @@ import (
 	"github.com/niflaot/corps-manager/internal/messages"
 	messagespostgres "github.com/niflaot/corps-manager/internal/messages/postgres"
 	"github.com/niflaot/corps-manager/internal/security"
+	settingspostgres "github.com/niflaot/corps-manager/internal/settings/postgres"
 	"github.com/niflaot/corps-manager/platform/agreementdiscord"
 	appconfig "github.com/niflaot/corps-manager/platform/app"
 	"github.com/niflaot/corps-manager/platform/clock"
@@ -14,6 +15,7 @@ import (
 	"github.com/niflaot/corps-manager/platform/health"
 	"github.com/niflaot/corps-manager/platform/httpapi"
 	"github.com/niflaot/corps-manager/platform/logger"
+	"github.com/niflaot/corps-manager/platform/messagesdiscord"
 	"github.com/niflaot/corps-manager/platform/postgres"
 	"github.com/niflaot/corps-manager/platform/securitydiscord"
 	"go.uber.org/fx"
@@ -27,10 +29,12 @@ var Module = fx.Module("bootstrap",
 	postgres.Module,
 	messagespostgres.Module,
 	agreementspostgres.Module,
+	settingspostgres.Module,
 	discord.Module,
 	messages.Module,
 	security.Module,
 	securitydiscord.Module,
+	messagesdiscord.Module,
 	agreements.Module,
 	agreementdiscord.Module,
 	health.Module,

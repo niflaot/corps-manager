@@ -140,7 +140,7 @@ func TestTrapBansOnlyMatchingGuildChannelAndNeverSelf(t *testing.T) {
 func TestMissingVerificationDoesNotPreventTrapRepair(t *testing.T) {
 	store := &messageStub{records: map[string]messages.Record{}}
 	gateway := &gatewayStub{trapID: "654"}
-	service := NewService(Config{AntibotEnabled: true, VerificationEnabled: true, MessageKey: "missing"}, "123", store, gateway)
+	service := NewService(Config{AntibotEnabled: true, VerificationEnabled: true, ChannelID: "456", RoleID: "321", MessageKey: "missing"}, "123", store, gateway)
 	if err := service.Refresh(context.Background()); !errors.Is(err, messages.ErrNotFound) {
 		t.Fatal(err)
 	}

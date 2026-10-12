@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/settings"
 )
 
 var (
@@ -47,13 +48,18 @@ type Service struct {
 	guildID  string
 	messages MessageStore
 	gateway  Gateway
+	settings settings.Store
 	trap     atomic.Value
 	mutex    sync.Mutex
 }
 
 // NewService builds security policy with injected persistence and Discord.
-func NewService(config Config, guildID string, store MessageStore, gateway Gateway) *Service {
-	return &Service{config: config, guildID: guildID, messages: store, gateway: gateway}
+func NewService(config Config, guildID string, store MessageStore, gateway Gateway, runtime ...settings.Store) *Service {
+	service := &Service{config: config, guildID: guildID, messages: store, gateway: gateway}
+	if len(runtime) > 0 {
+		service.settings = runtime[0]
+	}
+	return service
 }
 
 // Refresh independently reconciles enabled security controls.
@@ -62,35 +68,45 @@ func (service *Service) Refresh(ctx context.Context) error {
 		return nil
 	}
 	defer service.mutex.Unlock()
-	var failures []error
-	if service.config.AntibotEnabled {
-		failures = append(failures, service.refreshTrap(ctx))
+	config, err := service.Effective(ctx)
+	if err != nil {
+		return err
 	}
-	if service.config.VerificationEnabled {
-		failures = append(failures, service.refreshVerification(ctx))
+	var failures []error
+	if config.AntibotEnabled {
+		failures = append(failures, service.refreshTrap(ctx))
+	} else {
+		service.trap.Store("")
+	}
+	if config.VerificationReady() {
+		failures = append(failures, service.refreshVerification(ctx, config))
 	}
 	return errors.Join(failures...)
 }
 
 // Verify accepts only the currently bound managed message and grants the configured role.
 func (service *Service) Verify(ctx context.Context, guildID, channelID, messageID, userID string) error {
-	if !service.config.VerificationEnabled || guildID != service.guildID || channelID != service.config.ChannelID || !snowflakePattern.MatchString(userID) || messageID == "" {
+	config, err := service.Effective(ctx)
+	if err != nil {
+		return err
+	}
+	if !config.VerificationReady() || guildID != service.guildID || channelID != config.ChannelID || !snowflakePattern.MatchString(userID) || messageID == "" {
 		return ErrInvalidVerification
 	}
-	record, err := service.messages.Get(ctx, service.config.MessageKey)
+	record, err := service.messages.Get(ctx, config.MessageKey)
 	if err != nil {
 		return err
 	}
 	if record.State == messages.StateArchived || record.GuildID != guildID || record.ChannelID != channelID || record.DiscordMessageID != messageID {
 		return ErrInvalidVerification
 	}
-	return service.gateway.GrantRole(ctx, userID, service.config.RoleID)
+	return service.gateway.GrantRole(ctx, userID, config.RoleID)
 }
 
 // IsTrap reports whether a gateway event targets the current managed trap.
 func (service *Service) IsTrap(guildID, channelID string) bool {
 	active, _ := service.trap.Load().(string)
-	return service.config.AntibotEnabled && guildID == service.guildID && active != "" && channelID == active
+	return guildID == service.guildID && active != "" && channelID == active
 }
 
 // HandleMessage bans an author posting in the trap, excluding only this bot.

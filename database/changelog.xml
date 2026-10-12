@@ -11,4 +11,5 @@
     <include file="../internal/announcements/postgres/changelog.xml" relativeToChangelogFile="true"/>
     <include file="retired-customers.xml" relativeToChangelogFile="true"/>
     <include file="../internal/agreements/postgres/changelog.xml" relativeToChangelogFile="true"/>
+    <include file="../internal/settings/postgres/changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

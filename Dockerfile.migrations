@@ -13,3 +13,5 @@ COPY internal/announcements/postgres/changelog.xml ./internal/announcements/post
 COPY internal/announcements/postgres/migrations ./internal/announcements/postgres/migrations
 COPY internal/agreements/postgres/changelog.xml ./internal/agreements/postgres/changelog.xml
 COPY internal/agreements/postgres/migrations ./internal/agreements/postgres/migrations
+COPY internal/settings/postgres/changelog.xml ./internal/settings/postgres/changelog.xml
+COPY internal/settings/postgres/migrations ./internal/settings/postgres/migrations
