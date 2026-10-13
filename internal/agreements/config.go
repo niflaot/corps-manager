@@ -24,7 +24,7 @@ type Config struct {
 	RefreshInterval time.Duration `env:"DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL"`
 }
 
-// LoadConfig reads and validates agreement configuration.
+// LoadConfig reads the environment defaults; runtime settings may override them.
 func LoadConfig() (Config, error) {
 	config := Config{RefreshInterval: DefaultRefreshInterval}
 	if err := env.Parse(&config); err != nil {
@@ -34,8 +34,14 @@ func LoadConfig() (Config, error) {
 	if config.RefreshInterval <= 0 {
 		return Config{}, fmt.Errorf("DISCORD_BOT_AGREEMENTS_REFRESH_INTERVAL must be positive")
 	}
-	if config.Enabled && !snowflakePattern.MatchString(config.ControlChannelID) {
+	if config.ControlChannelID != "" && !snowflakePattern.MatchString(config.ControlChannelID) {
 		return Config{}, fmt.Errorf("DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID must be a Discord snowflake")
 	}
 	return config, nil
+}
+
+// normalized disables agreements until a control channel is bound.
+func (config Config) normalized() Config {
+	config.Enabled = config.Enabled && config.ControlChannelID != ""
+	return config
 }

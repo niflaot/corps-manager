@@ -28,12 +28,12 @@ type handler struct {
 	ctx     context.Context
 	guildID string
 	service *agreements.Service
-	config  agreements.Config
 	log     *zap.Logger
 }
 
 func (handler *handler) handle(session *discordgo.Session, event *discordgo.InteractionCreate) {
-	if !handler.config.Enabled || event.GuildID != handler.guildID || event.ChannelID != handler.config.ControlChannelID || event.Member == nil || event.Member.User == nil {
+	config := handler.service.Current()
+	if !config.Enabled || event.GuildID != handler.guildID || event.ChannelID != config.ControlChannelID || event.Member == nil || event.Member.User == nil {
 		return
 	}
 	id := customID(event)

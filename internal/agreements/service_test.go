@@ -53,7 +53,7 @@ func TestMaximumAgreementDescriptionsFitDiscord(t *testing.T) {
 }
 
 func TestInvalidCompanyAndAgreementInputs(t *testing.T) {
-	service := NewService(Config{Enabled: true}, nil, nil, "123")
+	service := NewService(Config{Enabled: true, ControlChannelID: "456"}, nil, nil, "123")
 	for _, item := range [][2]string{{"", "Valid company"}, {"UPPERCASE", "Valid company"}, {"company", ""}, {"company", strings.Repeat("x", 81)}} {
 		if _, err := service.CreateCompany(context.Background(), item[0], item[1], "123"); !errors.Is(err, ErrInvalidCompany) {
 			t.Fatalf("accepted invalid company: %v", err)
@@ -74,7 +74,7 @@ func TestInvalidCompanyAndAgreementInputs(t *testing.T) {
 }
 
 func TestAgreementEditAndDeleteValidateInputs(t *testing.T) {
-	service := NewService(Config{Enabled: true}, nil, nil, "123")
+	service := NewService(Config{Enabled: true, ControlChannelID: "456"}, nil, nil, "123")
 	if _, err := service.UpdateAgreement(context.Background(), "Bad Company", "id", "Description", ""); !errors.Is(err, ErrInvalidID) {
 		t.Fatal(err)
 	}

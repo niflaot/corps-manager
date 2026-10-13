@@ -5,8 +5,10 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
 	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/settings"
 )
 
 const maximumCompanyNameLength = 80
@@ -17,21 +19,29 @@ var companyIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,59}$`)
 
 // Service manages agreements and their managed Discord messages.
 type Service struct {
-	config     Config
+	base       Config
+	current    atomic.Pointer[Config]
+	settings   settings.Store
 	repository Repository
 	messages   *messages.Service
 	guildID    string
 }
 
 // NewService creates the agreements application service.
-func NewService(config Config, repository Repository, messageService *messages.Service, guildID string) *Service {
-	return &Service{config: config, repository: repository, messages: messageService, guildID: guildID}
+func NewService(config Config, repository Repository, messageService *messages.Service, guildID string, runtime ...settings.Store) *Service {
+	service := &Service{base: config, repository: repository, messages: messageService, guildID: guildID}
+	if len(runtime) > 0 {
+		service.settings = runtime[0]
+	}
+	config = config.normalized()
+	service.current.Store(&config)
+	return service
 }
 
 // Create validates and persists one agreement.
 func (service *Service) Create(ctx context.Context, companyID string, id string, description string, imageURL string,
 	actor string) (Agreement, error) {
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return Agreement{}, ErrDisabled
 	}
 	companyID = strings.TrimSpace(companyID)
@@ -60,7 +70,7 @@ func (service *Service) Create(ctx context.Context, companyID string, id string,
 
 // UpdateAgreement replaces an agreement's description and image and refreshes the panels.
 func (service *Service) UpdateAgreement(ctx context.Context, companyID, id, description, imageURL string) (Agreement, error) {
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return Agreement{}, ErrDisabled
 	}
 	if !agreementIDPattern.MatchString(companyID) || !agreementIDPattern.MatchString(id) {
@@ -80,7 +90,7 @@ func (service *Service) UpdateAgreement(ctx context.Context, companyID, id, desc
 
 // DeleteAgreement removes one agreement and refreshes the panels.
 func (service *Service) DeleteAgreement(ctx context.Context, companyID, id string) error {
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return ErrDisabled
 	}
 	if !agreementIDPattern.MatchString(companyID) || !agreementIDPattern.MatchString(id) {
@@ -108,7 +118,7 @@ func validateDetails(description, imageURL string) (string, string, error) {
 
 // List returns every configured agreement.
 func (service *Service) List(ctx context.Context) ([]Agreement, error) {
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return nil, ErrDisabled
 	}
 	return service.repository.List(ctx)
@@ -153,14 +163,14 @@ func (service *Service) DeleteCompany(ctx context.Context, id string) error {
 	if err := service.repository.DeleteCompany(ctx, id); err != nil {
 		return err
 	}
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return nil
 	}
 	return service.archive(ctx, companyMessageKey(id))
 }
 
 func (service *Service) refresh(ctx context.Context) error {
-	if !service.config.Enabled {
+	if !service.Current().Enabled {
 		return nil
 	}
 	return service.Publish(ctx)

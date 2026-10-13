@@ -30,7 +30,7 @@ func TestItemSelectorListsOnlyTheChosenCompany(t *testing.T) {
 		{CompanyID: "rage", CompanyName: "Rage", ID: "ems", Description: "Otro descuento"},
 	}}
 	handler := &handler{ctx: context.Background(), guildID: "123", log: zap.NewNop(),
-		service: agreements.NewService(agreements.Config{Enabled: true}, repository, nil, "123")}
+		service: agreements.NewService(agreements.Config{Enabled: true, ControlChannelID: "456"}, repository, nil, "123")}
 	session, _ := discordgo.New("Bot test")
 	var payload map[string]json.RawMessage
 	session.Client = &http.Client{Transport: transportFunc(func(request *http.Request) (*http.Response, error) {

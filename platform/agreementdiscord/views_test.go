@@ -73,7 +73,7 @@ func TestCompanySelectorPaginatesBeyondDiscordLimit(t *testing.T) {
 }
 
 func TestAgreementHandlerRejectsOtherGuildsAndChannels(t *testing.T) {
-	handler := &handler{ctx: context.Background(), guildID: "123", config: agreements.Config{Enabled: true, ControlChannelID: "456"}, log: zap.NewNop()}
+	handler := &handler{ctx: context.Background(), guildID: "123", service: agreements.NewService(agreements.Config{Enabled: true, ControlChannelID: "456"}, nil, nil, "123"), log: zap.NewNop()}
 	for _, scope := range [][2]string{{"999", "456"}, {"123", "999"}} {
 		event := &discordgo.InteractionCreate{Interaction: &discordgo.Interaction{GuildID: scope[0], ChannelID: scope[1], Type: discordgo.InteractionMessageComponent, Data: discordgo.MessageComponentInteractionData{CustomID: agreements.ButtonAddCustomID}, Member: &discordgo.Member{User: &discordgo.User{ID: "111"}}}}
 		// A rejected interaction must not touch either missing dependency.

@@ -18,7 +18,8 @@ const archiveKeyPrefix = "agreement-archive"
 
 // Publish creates or updates every company list and the control panel, archiving obsolete messages.
 func (service *Service) Publish(ctx context.Context) error {
-	if !service.config.Enabled {
+	config := service.Current()
+	if !config.Enabled {
 		return ErrDisabled
 	}
 	companies, err := service.repository.ListCompanies(ctx)
@@ -29,7 +30,7 @@ func (service *Service) Publish(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("list agreements for panel: %w", err)
 	}
-	definitions, err := Render(companies, items, service.config, service.guildID)
+	definitions, err := Render(companies, items, config, service.guildID)
 	if err != nil {
 		return err
 	}

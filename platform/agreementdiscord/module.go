@@ -11,12 +11,13 @@ import (
 )
 
 // Module registers the agreement Discord interaction adapter.
-var Module = fx.Module("agreement-discord", fx.Invoke(register))
+var Module = fx.Module("agreement-discord", fx.Provide(
+	fx.Annotate(newCommand, fx.ResultTags(`group:"discord_commands"`)),
+), fx.Invoke(register))
 
-func register(lifecycle fx.Lifecycle, client *discord.Client, service *agreements.Service,
-	config agreements.Config, log *zap.Logger) {
+func register(lifecycle fx.Lifecycle, client *discord.Client, service *agreements.Service, log *zap.Logger) {
 	ctx, cancel := context.WithCancel(context.Background())
-	handler := &handler{ctx: ctx, guildID: client.GuildID(), service: service, config: config, log: log}
+	handler := &handler{ctx: ctx, guildID: client.GuildID(), service: service, log: log}
 	remove := client.AddHandler(handler.handle)
 	lifecycle.Append(fx.Hook{OnStop: func(context.Context) error {
 		cancel()
