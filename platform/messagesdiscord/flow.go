@@ -90,6 +90,14 @@ func (c *command) present(ctx context.Context, session *discordgo.Session, inter
 		c.edit(ctx, session, interaction, "❌ "+problem, nil)
 		return
 	}
+	if item.Action != actionPreview {
+		result := c.execute(ctx, item, interaction.ID)
+		if converted {
+			result += "\nSe convirtió desde el formato clásico de embeds a Components V2."
+		}
+		c.edit(ctx, session, interaction, result, nil)
+		return
+	}
 	components, err := previewComponents(payload)
 	if err != nil {
 		c.edit(ctx, session, interaction, "❌ No se pudo preparar la vista previa: "+truncate(err.Error()), nil)
@@ -99,26 +107,13 @@ func (c *command) present(ctx context.Context, session *discordgo.Session, inter
 	if converted {
 		summary += "\nSe convirtió desde el formato clásico de embeds a Components V2; revisa que se vea como esperas."
 	}
-	id, buttons := "", []discordgo.MessageComponent(nil)
-	if item.Action != actionPreview {
-		if id, err = c.pending.put(item); err != nil {
-			c.edit(ctx, session, interaction, "Hay demasiadas vistas previas pendientes; inténtalo en unos minutos.", nil)
-			return
-		}
-		verb := map[action]string{actionCreate: "Crear", actionEdit: "Reemplazar"}[item.Action]
-		summary += fmt.Sprintf("\n**%s** `%s` en <#%s>. ¿Confirmas?", verb, item.Key, item.ChannelID)
-		buttons = confirmRow(id)
-	}
 	// The first follow-up replaces the deferred response, so the text message must be edited in before the V2 preview is sent.
-	c.edit(ctx, session, interaction, summary, buttons)
+	c.edit(ctx, session, interaction, summary, nil)
 	_, err = session.FollowupMessageCreate(interaction, true, &discordgo.WebhookParams{Components: components,
 		Flags:           discordgo.MessageFlagsEphemeral | discordgo.MessageFlagsIsComponentsV2,
 		AllowedMentions: &discordgo.MessageAllowedMentions{Parse: []discordgo.AllowedMentionType{}}}, discordgo.WithContext(ctx))
 	if err != nil {
 		c.log.Warn("discord rejected message preview", zap.Error(err))
-		if id != "" {
-			c.pending.discard(id, item.UserID)
-		}
 		c.edit(ctx, session, interaction, "❌ Discord rechazó la vista previa: "+truncate(err.Error()), nil)
 	}
 }

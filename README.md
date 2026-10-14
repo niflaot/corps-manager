@@ -85,11 +85,11 @@ Al arrancar, el bot registra en la guild los comandos `/verificacion`, `/antibot
 | `/verificacion publicar` / `estado` | Sincroniza el mensaje con el botón / muestra la configuración vigente |
 | `/antibot configurar` / `estado` | Activa o desactiva la trampa / muestra su estado |
 | `/convenios configurar` / `estado` | Define el canal de control y activa los convenios, y publica el panel / muestra la configuración |
-| `/mensaje crear` / `editar` | Recibe JSON, lo valida, muestra la vista previa y pide confirmación |
+| `/mensaje crear` / `editar` | Recibe JSON, lo valida y crea o reemplaza el mensaje |
 | `/mensaje previsualizar` | Valida un JSON y lo muestra sin publicar nada |
 | `/mensaje ver` / `archivar` / `listar` | Exporta el JSON vigente, deja de gestionar un mensaje o lista los existentes |
 
-El JSON se adjunta en `archivo` (hasta 256 KiB) o se pega en un formulario si se omite. Acepta el mismo objeto que la API (`{"components":[...],"allowedMentions":{...}}`), un arreglo de componentes o un mensaje clásico con `content` y `embeds` (por ejemplo, el que genera un creador de embeds), que se convierte automáticamente a Components V2: cada embed pasa a un contenedor con su color, título, descripción, campos, imagen y miniatura. La API HTTP sigue aceptando solo Components V2. La vista previa es privada, no menciona a nadie y muestra los botones desactivados; la publicación ocurre solo al pulsar **Confirmar**.
+El JSON se adjunta en `archivo` (hasta 256 KiB) o se pega en un formulario si se omite. Acepta el mismo objeto que la API (`{"components":[...],"allowedMentions":{...}}`), un arreglo de componentes o un mensaje clásico con `content` y `embeds` (por ejemplo, el que genera un creador de embeds), que se convierte automáticamente a Components V2: cada embed pasa a un contenedor con su color, título, descripción, campos, imagen y miniatura. La API HTTP sigue aceptando solo Components V2. `/mensaje crear` y `/mensaje editar` validan el JSON y crean o reemplazan el mensaje de inmediato; si el JSON es inválido, responden con el error y no guardan nada. `/mensaje previsualizar` muestra una vista previa privada, sin menciones y con los botones desactivados, sin publicar. `/mensaje archivar` pide confirmación.
 
 Los valores guardados con `/verificacion` y `/antibot` se almacenan en la tabla `bot_settings` y tienen prioridad sobre las variables `DISCORD_BOT_VERIFICATION_*` `DISCORD_BOT_ANTIBOT_ENABLED` y `DISCORD_BOT_AGREEMENTS_ENABLED`/`DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID`, que quedan como valores iniciales. Aplica la migración de Liquibase antes de desplegar.
 
