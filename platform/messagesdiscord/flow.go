@@ -80,7 +80,7 @@ func modalText(data discordgo.ModalSubmitInteractionData) string {
 }
 
 func (c *command) present(ctx context.Context, session *discordgo.Session, interaction *discordgo.Interaction, item pending, raw []byte) {
-	payload, err := parsePayload(raw)
+	payload, converted, err := parsePayload(raw)
 	if err != nil {
 		c.edit(ctx, session, interaction, "❌ "+truncate(err.Error()), nil)
 		return
@@ -102,6 +102,9 @@ func (c *command) present(ctx context.Context, session *discordgo.Session, inter
 		return
 	}
 	summary := fmt.Sprintf("✅ JSON válido · %d componentes de primer nivel. La vista previa está debajo; sus botones aparecen desactivados.", len(payload.Components))
+	if converted {
+		summary += "\nSe convirtió desde el formato clásico de embeds a Components V2; revisa que se vea como esperas."
+	}
 	if item.Action == actionPreview {
 		c.edit(ctx, session, interaction, summary, nil)
 		return

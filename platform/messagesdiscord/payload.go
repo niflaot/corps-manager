@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/niflaot/corps-manager/internal/messages"
+	"github.com/niflaot/corps-manager/internal/messages/classic"
 )
 
 // maxPayloadBytes bounds JSON accepted from attachments and modals.
@@ -19,33 +21,51 @@ const maxPayloadBytes = 256 << 10
 const buttonComponentType = 2
 
 // parsePayload decodes, normalizes, and validates a message body.
-// It accepts either the API payload object or a bare array of components.
-func parsePayload(raw []byte) (messages.Payload, error) {
+// It accepts the API payload object, a bare array of components, or a classic
+// message with embeds, which is converted and reported through the boolean.
+func parsePayload(raw []byte) (messages.Payload, bool, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
-		return messages.Payload{}, errors.New("el JSON está vacío")
+		return messages.Payload{}, false, errors.New("el JSON está vacío")
 	}
 	if len(raw) > maxPayloadBytes {
-		return messages.Payload{}, fmt.Errorf("el JSON supera %d KiB", maxPayloadBytes>>10)
+		return messages.Payload{}, false, fmt.Errorf("el JSON supera %d KiB", maxPayloadBytes>>10)
 	}
 	var payload messages.Payload
-	if raw[0] == '[' {
-		if err := json.Unmarshal(raw, &payload.Components); err != nil {
-			return messages.Payload{}, fmt.Errorf("JSON inválido: %w", err)
+	var err error
+	converted := classic.IsClassic(raw)
+	switch {
+	case converted:
+		payload, err = classic.Convert(raw)
+	case raw[0] == '[':
+		if err = json.Unmarshal(raw, &payload.Components); err != nil {
+			err = fmt.Errorf("JSON inválido: %w", err)
 		}
-	} else {
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&payload); err != nil {
-			return messages.Payload{}, fmt.Errorf("JSON inválido: %w", err)
-		}
-		if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-			return messages.Payload{}, errors.New("JSON inválido: hay contenido después del objeto")
-		}
+	default:
+		payload, err = decodeObject(raw)
+	}
+	if err != nil {
+		return messages.Payload{}, false, err
 	}
 	payload = payload.Normalize()
 	if err := payload.Validate(); err != nil {
-		return messages.Payload{}, err
+		return messages.Payload{}, false, err
+	}
+	return payload, converted, nil
+}
+
+func decodeObject(raw []byte) (messages.Payload, error) {
+	var payload messages.Payload
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
+		if strings.Contains(err.Error(), "unknown field") {
+			return payload, fmt.Errorf("JSON inválido: %w. Usa {\"components\":[...]}, un arreglo de componentes o un mensaje clásico con \"embeds\"", err)
+		}
+		return payload, fmt.Errorf("JSON inválido: %w", err)
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return payload, errors.New("JSON inválido: hay contenido después del objeto")
 	}
 	return payload, nil
 }

@@ -89,7 +89,7 @@ Al arrancar, el bot registra en la guild los comandos `/verificacion`, `/antibot
 | `/mensaje previsualizar` | Valida un JSON y lo muestra sin publicar nada |
 | `/mensaje ver` / `archivar` / `listar` | Exporta el JSON vigente, deja de gestionar un mensaje o lista los existentes |
 
-El JSON se adjunta en `archivo` (hasta 256 KiB) o se pega en un formulario si se omite. Acepta el mismo objeto que la API (`{"components":[...],"allowedMentions":{...}}`) o un arreglo de componentes. La vista previa es privada, no menciona a nadie y muestra los botones desactivados; la publicación ocurre solo al pulsar **Confirmar**.
+El JSON se adjunta en `archivo` (hasta 256 KiB) o se pega en un formulario si se omite. Acepta el mismo objeto que la API (`{"components":[...],"allowedMentions":{...}}`), un arreglo de componentes o un mensaje clásico con `content` y `embeds` (por ejemplo, el que genera un creador de embeds), que se convierte automáticamente a Components V2: cada embed pasa a un contenedor con su color, título, descripción, campos, imagen y miniatura. La API HTTP sigue aceptando solo Components V2. La vista previa es privada, no menciona a nadie y muestra los botones desactivados; la publicación ocurre solo al pulsar **Confirmar**.
 
 Los valores guardados con `/verificacion` y `/antibot` se almacenan en la tabla `bot_settings` y tienen prioridad sobre las variables `DISCORD_BOT_VERIFICATION_*` `DISCORD_BOT_ANTIBOT_ENABLED` y `DISCORD_BOT_AGREEMENTS_ENABLED`/`DISCORD_BOT_AGREEMENTS_CONTROL_CHANNEL_ID`, que quedan como valores iniciales. Aplica la migración de Liquibase antes de desplegar.
 
@@ -149,6 +149,7 @@ Se retiraron también las variables `PERFORMANCE_*`, `INACTIVITY_*`, `ANNOUNCEME
 - `internal/security`: políticas de verificación y anti bots.
 - `internal/settings`: ajustes editables en runtime (PostgreSQL).
 - `platform/messagesdiscord`: comando `/mensaje`.
+- `internal/messages/classic`: conversión de embeds clásicos a Components V2.
 - `internal/agreements`: empresas, convenios y paneles.
 - `internal/cronjob`: trabajos cancelables por contexto.
 - `platform/`: adaptadores de Discord, API HTTP, PostgreSQL, reloj, logs y composición Fx.

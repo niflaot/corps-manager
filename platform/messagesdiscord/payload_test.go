@@ -12,7 +12,7 @@ func TestParsePayloadAcceptsObjectAndBareArray(t *testing.T) {
 		`[{"type":10,"content":"Hola"}]`,
 		` {"components":[{"type":17,"components":[{"type":10,"content":"x"}]}],"allowedMentions":{"parse":[]}} `,
 	} {
-		if _, err := parsePayload([]byte(raw)); err != nil {
+		if _, _, err := parsePayload([]byte(raw)); err != nil {
 			t.Fatalf("%s: %v", raw, err)
 		}
 	}
@@ -29,14 +29,14 @@ func TestParsePayloadRejectsInvalidInput(t *testing.T) {
 		"empty text":   `[{"type":10,"content":""}]`,
 		"too large":    `[{"type":10,"content":"` + strings.Repeat("a", maxPayloadBytes) + `"}]`,
 	} {
-		if _, err := parsePayload([]byte(raw)); err == nil {
+		if _, _, err := parsePayload([]byte(raw)); err == nil {
 			t.Fatalf("%s accepted", name)
 		}
 	}
 }
 
 func TestPreviewDisablesEveryButton(t *testing.T) {
-	payload, err := parsePayload([]byte(`[{"type":17,"components":[{"type":9,"components":[{"type":10,"content":"x"}],"accessory":{"type":2,"style":1,"label":"A","custom_id":"a"}},{"type":1,"components":[{"type":2,"style":1,"label":"B","custom_id":"security:verify"},{"type":2,"style":5,"label":"C","url":"https://example.com"}]}]}]`))
+	payload, _, err := parsePayload([]byte(`[{"type":17,"components":[{"type":9,"components":[{"type":10,"content":"x"}],"accessory":{"type":2,"style":1,"label":"A","custom_id":"a"}},{"type":1,"components":[{"type":2,"style":1,"label":"B","custom_id":"security:verify"},{"type":2,"style":5,"label":"C","url":"https://example.com"}]}]}]`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,5 +47,18 @@ func TestPreviewDisablesEveryButton(t *testing.T) {
 	encoded, _ := json.Marshal(components)
 	if strings.Count(string(encoded), `"disabled":true`) != 3 {
 		t.Fatalf("buttons not disabled: %s", encoded)
+	}
+}
+
+func TestParsePayloadConvertsClassicEmbeds(t *testing.T) {
+	payload, converted, err := parsePayload([]byte(`{"content":"hola","embeds":[{"description":"- a","color":15548997,"author":{"name":"PRECIOS:"},"thumbnail":{"url":"https://i.imgur.com/a.png"}}]}`))
+	if err != nil || !converted || len(payload.Components) != 2 {
+		t.Fatalf("payload=%+v converted=%t err=%v", payload, converted, err)
+	}
+	if _, converted, err := parsePayload([]byte(`[{"type":10,"content":"x"}]`)); err != nil || converted {
+		t.Fatalf("native payload flagged as converted: %v", err)
+	}
+	if _, _, err := parsePayload([]byte(`{"componentz":[]}`)); err == nil || !strings.Contains(err.Error(), "embeds") {
+		t.Fatalf("unknown field hint missing: %v", err)
 	}
 }
